@@ -101,6 +101,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { trpc } from "@/components/providers/trpc-provider";
 
 // TODO: REMOVE IN PRODUCTION - Sample data generator imports for development/testing only
 import { IconDatabase } from "@tabler/icons-react";
@@ -444,6 +445,7 @@ export function TeamTable({
 }: {
   data: z.infer<typeof teamSchema>[];
 }) {
+  const { data: currentUser } = trpc.profile.getCurrentUser.useQuery();
   const [data, setData] = React.useState(() => initialData);
   const [rowSelection, setRowSelection] = React.useState({});
   const [columnVisibility, setColumnVisibility] =
@@ -621,16 +623,19 @@ export function TeamTable({
                 })}
             </DropdownMenuContent>
           </DropdownMenu>
-          <TeamMemberModal
+          {currentUser?.roles?.includes("admin") && (<TeamMemberModal
             mode="add"
             trigger={
-              <Button variant="outline" size="sm">
+              <Button
+                variant="outline" 
+                size="sm"
+              >
                 <IconPlus />
                 <span className="hidden lg:inline">Thêm nhân viên</span>
               </Button>
             }
             onSuccess={() => window.location.reload()}
-          />
+          />)}
 
           {/* TODO: REMOVE IN PRODUCTION - Sample data generator for development/testing only */}
           <SampleDataGenerator onSuccess={() => window.location.reload()} />
