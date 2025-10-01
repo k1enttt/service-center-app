@@ -609,7 +609,7 @@ export function EditTicketForm({ ticket }: EditTicketFormProps) {
                 {parts.map((part: any) => (
                   <div
                     key={part.id}
-                    className="flex items-center justify-between p-3 border rounded-lg"
+                    className="flex items-center justify-between border-b pb-2"
                   >
                     <div className="flex-1">
                       <p className="font-medium">{part.part_name}</p>
