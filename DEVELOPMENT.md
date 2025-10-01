@@ -117,6 +117,7 @@ This script will:
 ### 7. Start Development Server
 
 ```bash
+sudo apt install postgresql-client-common
 pnpm dev
 ```
 
