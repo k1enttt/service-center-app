@@ -2,11 +2,23 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { trpc } from "@/components/providers/trpc-provider";
@@ -41,11 +53,22 @@ export function EditTicketForm({ ticket }: EditTicketFormProps) {
   );
 
   const [editingPartId, setEditingPartId] = useState<string | null>(null);
-  const [editingPartData, setEditingPartData] = useState<{ quantity: number; unit_price: number } | null>(null);
+  const [editingPartData, setEditingPartData] = useState<{
+    quantity: number;
+    unit_price: number;
+  } | null>(null);
 
   const { data: availableParts } = trpc.parts.getParts.useQuery();
+  const { data: currentUser } = trpc.profile.getCurrentUser.useQuery();
   const [selectedNewPart, setSelectedNewPart] = useState<string>("");
   const [newPartQuantity, setNewPartQuantity] = useState(1);
+
+  // Check if user has permission to manage parts (technician, manager, admin)
+  const canManageParts =
+    currentUser?.roles?.some(
+      (role: string) =>
+        role === "technician" || role === "manager" || role === "admin"
+    ) ?? false;
 
   const updateTicketMutation = trpc.tickets.updateTicket.useMutation({
     onSuccess: () => {
@@ -98,9 +121,17 @@ export function EditTicketForm({ ticket }: EditTicketFormProps) {
     updateTicketMutation.mutate({
       id: ticket.id,
       issue_description: formData.issue_description,
-      priority_level: formData.priority_level as "low" | "normal" | "high" | "urgent",
+      priority_level: formData.priority_level as
+        | "low"
+        | "normal"
+        | "high"
+        | "urgent",
       warranty_type: formData.warranty_type as "warranty" | "paid" | "goodwill",
-      status: formData.status as "pending" | "in_progress" | "completed" | "cancelled",
+      status: formData.status as
+        | "pending"
+        | "in_progress"
+        | "completed"
+        | "cancelled",
       service_fee: Number(formData.service_fee),
       diagnosis_fee: Number(formData.diagnosis_fee),
       discount_amount: Number(formData.discount_amount),
@@ -158,8 +189,15 @@ export function EditTicketForm({ ticket }: EditTicketFormProps) {
     }
   };
 
-  const partsTotal = parts.reduce((sum: number, part: any) => sum + (part.total_price || 0), 0);
-  const totalCost = Number(formData.service_fee) + Number(formData.diagnosis_fee) + partsTotal - Number(formData.discount_amount);
+  const partsTotal = parts.reduce(
+    (sum: number, part: any) => sum + (part.total_price || 0),
+    0
+  );
+  const totalCost =
+    Number(formData.service_fee) +
+    Number(formData.diagnosis_fee) +
+    partsTotal -
+    Number(formData.discount_amount);
 
   return (
     <form onSubmit={handleSubmit} className="grid gap-6">
@@ -167,7 +205,9 @@ export function EditTicketForm({ ticket }: EditTicketFormProps) {
       <Card>
         <CardHeader>
           <CardTitle>Thông tin cơ bản</CardTitle>
-          <CardDescription>Thông tin khách hàng và sản phẩm (không thể chỉnh sửa)</CardDescription>
+          <CardDescription>
+            Thông tin khách hàng và sản phẩm (không thể chỉnh sửa)
+          </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2">
           <div className="space-y-2">
@@ -193,7 +233,9 @@ export function EditTicketForm({ ticket }: EditTicketFormProps) {
       <Card>
         <CardHeader>
           <CardTitle>Chi tiết phiếu dịch vụ</CardTitle>
-          <CardDescription>Cập nhật thông tin phiếu dịch vụ {ticket.ticket_number}</CardDescription>
+          <CardDescription>
+            Cập nhật thông tin phiếu dịch vụ {ticket.ticket_number}
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           {/* Status and Priority */}
@@ -202,7 +244,9 @@ export function EditTicketForm({ ticket }: EditTicketFormProps) {
               <Label htmlFor="status">Trạng thái</Label>
               <Select
                 value={formData.status}
-                onValueChange={(value) => setFormData({ ...formData, status: value })}
+                onValueChange={(value) =>
+                  setFormData({ ...formData, status: value })
+                }
               >
                 <SelectTrigger id="status">
                   <SelectValue />
@@ -220,7 +264,9 @@ export function EditTicketForm({ ticket }: EditTicketFormProps) {
               <Label htmlFor="priority">Độ ưu tiên</Label>
               <Select
                 value={formData.priority_level}
-                onValueChange={(value) => setFormData({ ...formData, priority_level: value })}
+                onValueChange={(value) =>
+                  setFormData({ ...formData, priority_level: value })
+                }
               >
                 <SelectTrigger id="priority">
                   <SelectValue />
@@ -238,7 +284,9 @@ export function EditTicketForm({ ticket }: EditTicketFormProps) {
               <Label htmlFor="warranty">Loại bảo hành</Label>
               <Select
                 value={formData.warranty_type}
-                onValueChange={(value) => setFormData({ ...formData, warranty_type: value })}
+                onValueChange={(value) =>
+                  setFormData({ ...formData, warranty_type: value })
+                }
               >
                 <SelectTrigger id="warranty">
                   <SelectValue />
@@ -258,7 +306,9 @@ export function EditTicketForm({ ticket }: EditTicketFormProps) {
             <Textarea
               id="description"
               value={formData.issue_description}
-              onChange={(e) => setFormData({ ...formData, issue_description: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, issue_description: e.target.value })
+              }
               rows={4}
               required
             />
@@ -270,7 +320,9 @@ export function EditTicketForm({ ticket }: EditTicketFormProps) {
             <Textarea
               id="notes"
               value={formData.notes}
-              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, notes: e.target.value })
+              }
               rows={3}
               placeholder="Ghi chú thêm về phiếu dịch vụ..."
             />
@@ -293,7 +345,12 @@ export function EditTicketForm({ ticket }: EditTicketFormProps) {
                 min="0"
                 step="1000"
                 value={formData.service_fee}
-                onChange={(e) => setFormData({ ...formData, service_fee: Number(e.target.value) })}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    service_fee: Number(e.target.value),
+                  })
+                }
                 required
               />
             </div>
@@ -306,7 +363,12 @@ export function EditTicketForm({ ticket }: EditTicketFormProps) {
                 min="0"
                 step="1000"
                 value={formData.diagnosis_fee}
-                onChange={(e) => setFormData({ ...formData, diagnosis_fee: Number(e.target.value) })}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    diagnosis_fee: Number(e.target.value),
+                  })
+                }
               />
             </div>
 
@@ -318,7 +380,12 @@ export function EditTicketForm({ ticket }: EditTicketFormProps) {
                 min="0"
                 step="1000"
                 value={formData.discount_amount}
-                onChange={(e) => setFormData({ ...formData, discount_amount: Number(e.target.value) })}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    discount_amount: Number(e.target.value),
+                  })
+                }
               />
             </div>
           </div>
@@ -327,11 +394,15 @@ export function EditTicketForm({ ticket }: EditTicketFormProps) {
           <div className="mt-6 space-y-2 border-t pt-4">
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Giá dịch vụ:</span>
-              <span>{Number(formData.service_fee).toLocaleString("vi-VN")} ₫</span>
+              <span>
+                {Number(formData.service_fee).toLocaleString("vi-VN")} ₫
+              </span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Phí kiểm tra:</span>
-              <span>{Number(formData.diagnosis_fee).toLocaleString("vi-VN")} ₫</span>
+              <span>
+                {Number(formData.diagnosis_fee).toLocaleString("vi-VN")} ₫
+              </span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Linh kiện:</span>
@@ -340,175 +411,229 @@ export function EditTicketForm({ ticket }: EditTicketFormProps) {
             {formData.discount_amount > 0 && (
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Giảm giá:</span>
-                <span className="text-red-600">-{Number(formData.discount_amount).toLocaleString("vi-VN")} ₫</span>
+                <span className="text-red-600">
+                  -{Number(formData.discount_amount).toLocaleString("vi-VN")} ₫
+                </span>
               </div>
             )}
             <div className="flex justify-between text-lg font-bold border-t pt-2">
               <span>Tổng cộng:</span>
-              <span className="text-primary">{totalCost.toLocaleString("vi-VN")} ₫</span>
+              <span className="text-primary">
+                {totalCost.toLocaleString("vi-VN")} ₫
+              </span>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Parts Management */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Quản lý linh kiện</CardTitle>
-          <CardDescription>
-            Thêm, sửa hoặc xóa linh kiện sử dụng trong phiếu dịch vụ
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Add New Part */}
-          <div className="border rounded-lg p-4 space-y-3">
-            <h4 className="font-medium">Thêm linh kiện mới</h4>
-            <div className="grid gap-3 md:grid-cols-4">
-              <div className="md:col-span-2">
-                <Label htmlFor="new-part">Linh kiện</Label>
-                <Select value={selectedNewPart} onValueChange={setSelectedNewPart}>
-                  <SelectTrigger id="new-part">
-                    <SelectValue placeholder="Chọn linh kiện" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableParts?.map((part) => (
-                      <SelectItem key={part.id} value={part.id}>
-                        {part.name} - {part.price.toLocaleString("vi-VN")} ₫
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="new-quantity">Số lượng</Label>
-                <Input
-                  id="new-quantity"
-                  type="number"
-                  min="1"
-                  value={newPartQuantity}
-                  onChange={(e) => setNewPartQuantity(Number(e.target.value))}
-                />
-              </div>
-              <div className="flex items-end">
-                <Button
-                  type="button"
-                  onClick={handleAddPart}
-                  disabled={addPartMutation.isPending}
-                  className="w-full"
-                >
-                  <IconPlus className="h-4 w-4 mr-2" />
-                  Thêm
-                </Button>
-              </div>
-            </div>
-          </div>
-
-          {/* Existing Parts List */}
-          {parts.length > 0 ? (
-            <div className="space-y-2">
-              <h4 className="font-medium">Linh kiện đã sử dụng</h4>
-              {parts.map((part: any) => (
-                <div key={part.id} className="flex items-center gap-2 border-b pb-2">
-                  {editingPartId === part.id ? (
-                    // Edit mode
-                    <>
-                      <div className="flex-1 grid grid-cols-3 gap-2">
-                        <div>
-                          <p className="text-sm font-medium">{part.part_name}</p>
-                        </div>
-                        <div>
-                          <Input
-                            type="number"
-                            min="1"
-                            value={editingPartData?.quantity}
-                            onChange={(e) =>
-                              setEditingPartData({
-                                ...editingPartData!,
-                                quantity: Number(e.target.value),
-                              })
-                            }
-                            className="h-8"
-                          />
-                        </div>
-                        <div>
-                          <Input
-                            type="number"
-                            min="0"
-                            value={editingPartData?.unit_price}
-                            onChange={(e) =>
-                              setEditingPartData({
-                                ...editingPartData!,
-                                unit_price: Number(e.target.value),
-                              })
-                            }
-                            className="h-8"
-                          />
-                        </div>
-                      </div>
-                      <div className="flex gap-1">
-                        <Button
-                          type="button"
-                          size="sm"
-                          onClick={handleSaveEdit}
-                          disabled={updatePartMutation.isPending}
-                        >
-                          Lưu
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          onClick={handleCancelEdit}
-                        >
-                          Hủy
-                        </Button>
-                      </div>
-                    </>
-                  ) : (
-                    // View mode
-                    <>
-                      <div className="flex-1">
-                        <p className="font-medium">{part.part_name}</p>
-                        <p className="text-sm text-muted-foreground">
-                          Số lượng: {part.quantity} × {part.unit_price.toLocaleString("vi-VN")} ₫
-                        </p>
-                      </div>
-                      <div className="text-right min-w-[100px]">
-                        <p className="font-medium">
-                          {part.total_price.toLocaleString("vi-VN")} ₫
-                        </p>
-                      </div>
-                      <div className="flex gap-1">
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => handleStartEdit(part)}
-                        >
-                          <IconEdit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => handleDeletePart(part.id)}
-                          disabled={deletePartMutation.isPending}
-                        >
-                          <IconTrash className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </>
-                  )}
+      {/* Parts Management - Show based on user permissions */}
+      {canManageParts ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Quản lý linh kiện</CardTitle>
+            <CardDescription>
+              Thêm, sửa hoặc xóa linh kiện sử dụng trong phiếu dịch vụ
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Add New Part */}
+            <div className="border rounded-lg p-4 space-y-3">
+              <h4 className="font-medium">Thêm linh kiện mới</h4>
+              <div className="grid gap-3 md:grid-cols-4">
+                <div className="md:col-span-2">
+                  <Label htmlFor="new-part">Linh kiện</Label>
+                  <Select
+                    value={selectedNewPart}
+                    onValueChange={setSelectedNewPart}
+                  >
+                    <SelectTrigger id="new-part">
+                      <SelectValue placeholder="Chọn linh kiện" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableParts?.map((part) => (
+                        <SelectItem key={part.id} value={part.id}>
+                          {part.name} - {part.price.toLocaleString("vi-VN")} ₫
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
-              ))}
+                <div>
+                  <Label htmlFor="new-quantity">Số lượng</Label>
+                  <Input
+                    id="new-quantity"
+                    type="number"
+                    min="1"
+                    value={newPartQuantity}
+                    onChange={(e) => setNewPartQuantity(Number(e.target.value))}
+                  />
+                </div>
+                <div className="flex items-end">
+                  <Button
+                    type="button"
+                    onClick={handleAddPart}
+                    disabled={addPartMutation.isPending}
+                    className="w-full"
+                  >
+                    <IconPlus className="h-4 w-4 mr-2" />
+                    Thêm
+                  </Button>
+                </div>
+              </div>
             </div>
-          ) : (
-            <p className="text-sm text-muted-foreground text-center py-4">
-              Chưa có linh kiện nào được sử dụng
-            </p>
-          )}
-        </CardContent>
-      </Card>
+
+            {/* Existing Parts List */}
+            {parts.length > 0 ? (
+              <div className="space-y-2">
+                <h4 className="font-medium">Linh kiện đã sử dụng</h4>
+                {parts.map((part: any) => (
+                  <div
+                    key={part.id}
+                    className="flex items-center gap-2 border-b pb-2"
+                  >
+                    {editingPartId === part.id ? (
+                      // Edit mode
+                      <>
+                        <div className="flex-1 grid grid-cols-3 gap-2">
+                          <div>
+                            <p className="text-sm font-medium">
+                              {part.part_name}
+                            </p>
+                          </div>
+                          <div>
+                            <Input
+                              type="number"
+                              min="1"
+                              value={editingPartData?.quantity}
+                              onChange={(e) =>
+                                setEditingPartData({
+                                  ...editingPartData!,
+                                  quantity: Number(e.target.value),
+                                })
+                              }
+                              className="h-8"
+                            />
+                          </div>
+                          <div>
+                            <Input
+                              type="number"
+                              min="0"
+                              value={editingPartData?.unit_price}
+                              onChange={(e) =>
+                                setEditingPartData({
+                                  ...editingPartData!,
+                                  unit_price: Number(e.target.value),
+                                })
+                              }
+                              className="h-8"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex gap-1">
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={handleSaveEdit}
+                            disabled={updatePartMutation.isPending}
+                          >
+                            Lưu
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={handleCancelEdit}
+                          >
+                            Hủy
+                          </Button>
+                        </div>
+                      </>
+                    ) : (
+                      // View mode
+                      <>
+                        <div className="flex-1">
+                          <p className="font-medium">{part.part_name}</p>
+                          <p className="text-sm text-muted-foreground">
+                            Số lượng: {part.quantity} ×{" "}
+                            {part.unit_price.toLocaleString("vi-VN")} ₫
+                          </p>
+                        </div>
+                        <div className="text-right min-w-[100px]">
+                          <p className="font-medium">
+                            {part.total_price.toLocaleString("vi-VN")} ₫
+                          </p>
+                        </div>
+                        <div className="flex gap-1">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleStartEdit(part)}
+                          >
+                            <IconEdit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleDeletePart(part.id)}
+                            disabled={deletePartMutation.isPending}
+                          >
+                            <IconTrash className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                Chưa có linh kiện nào được sử dụng
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      ) : (
+        // ViewOnlyPartsCard component for users without management permissions
+        <Card>
+          <CardHeader>
+            <CardTitle>Linh kiện đã sử dụng</CardTitle>
+            <CardDescription>
+              Danh sách linh kiện được sử dụng trong phiếu dịch vụ này
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {parts.length > 0 ? (
+              <div className="space-y-2">
+                {parts.map((part: any) => (
+                  <div
+                    key={part.id}
+                    className="flex items-center justify-between p-3 border rounded-lg"
+                  >
+                    <div className="flex-1">
+                      <p className="font-medium">{part.part_name}</p>
+                      <p className="text-sm text-muted-foreground">
+                        Số lượng: {part.quantity} ×{" "}
+                        {part.unit_price.toLocaleString("vi-VN")} ₫
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-medium">
+                        {part.total_price.toLocaleString("vi-VN")} ₫
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                Chưa có linh kiện nào được sử dụng
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Actions */}
       <div className="flex justify-end gap-2">
