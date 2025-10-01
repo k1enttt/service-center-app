@@ -16,6 +16,7 @@ import {
 } from "@tabler/icons-react";
 import type * as React from "react";
 
+import { trpc } from "@/components/providers/trpc-provider";
 import { NavDocuments } from "@/components/nav-documents";
 import { NavMain } from "@/components/nav-main";
 import { NavSecondary } from "@/components/nav-secondary";
@@ -95,6 +96,22 @@ const data = {
 };
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const { data: currentUser } = trpc.profile.getCurrentUser.useQuery();
+  
+  // Check if user is admin or manager
+  const isAdminOrManager = currentUser?.roles?.some((role: string) => 
+    role === 'admin' || role === 'manager'
+  ) ?? false;
+
+  // Filter documents based on user role
+  const filteredDocuments = data.documents.filter(doc => {
+    // Hide "Sản phẩm dịch vụ" and "Kho linh kiện" for non-admin/manager users
+    if (!isAdminOrManager && (doc.url === '/products' || doc.url === '/parts')) {
+      return false;
+    }
+    return true;
+  });
+
   return (
     <Sidebar collapsible="offcanvas" {...props}>
       <SidebarHeader>
@@ -116,7 +133,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarHeader>
       <SidebarContent>
         <NavMain items={data.navMain} />
-        <NavDocuments items={data.documents} />
+        <NavDocuments items={filteredDocuments} />
         <NavSecondary items={data.navSecondary} className="mt-auto" />
       </SidebarContent>
       <SidebarFooter>
