@@ -818,6 +818,7 @@ function TeamMemberModal({
   onSuccess,
 }: TeamMemberModalProps) {
   const isMobile = useIsMobile();
+  const { data: currentUser } = trpc.profile.getCurrentUser.useQuery();
   const [open, setOpen] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(false);
   const [formData, setFormData] = React.useState({
@@ -828,6 +829,9 @@ function TeamMemberModal({
     role: "technician",
     is_active: true,
   });
+
+  // Check if current user is admin
+  const isCurrentUserAdmin = currentUser?.roles?.includes("admin") ?? false;
 
   // Reset form when modal opens or mode/member changes
   React.useEffect(() => {
@@ -987,6 +991,7 @@ function TeamMemberModal({
                 onValueChange={(value) =>
                   setFormData({ ...formData, role: value as any })
                 }
+                disabled={!isCurrentUserAdmin}
               >
                 <SelectTrigger id="roles" className="w-full">
                   <SelectValue placeholder="Select role" />
@@ -998,6 +1003,11 @@ function TeamMemberModal({
                   <SelectItem value="reception">Reception</SelectItem>
                 </SelectContent>
               </Select>
+              {!isCurrentUserAdmin && (
+                <p className="text-xs text-muted-foreground">
+                  Only administrators can modify user roles
+                </p>
+              )}
             </div>
             <div className="flex flex-col gap-3">
               <Label htmlFor="is_active">Status</Label>
