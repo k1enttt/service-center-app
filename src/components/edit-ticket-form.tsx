@@ -59,7 +59,7 @@ export function EditTicketForm({ ticket }: EditTicketFormProps) {
   } | null>(null);
 
   const { data: availableParts } = trpc.parts.getParts.useQuery();
-  const { data: currentUser } = trpc.profile.getCurrentUser.useQuery();
+  const { data: currentUser, isLoading: isLoadingUser } = trpc.profile.getCurrentUser.useQuery();
   const [selectedNewPart, setSelectedNewPart] = useState<string>("");
   const [newPartQuantity, setNewPartQuantity] = useState(1);
 
@@ -68,6 +68,13 @@ export function EditTicketForm({ ticket }: EditTicketFormProps) {
     currentUser?.roles?.some(
       (role: string) =>
         role === "technician" || role === "manager" || role === "admin"
+    ) ?? false;
+
+  // Check if user has permission to edit ticket status (admin, manager, technician)
+  const canEditStatus =
+    currentUser?.roles?.some(
+      (role: string) =>
+        role === "admin" || role === "manager" || role === "technician"
     ) ?? false;
 
   const updateTicketMutation = trpc.tickets.updateTicket.useMutation({
@@ -247,6 +254,7 @@ export function EditTicketForm({ ticket }: EditTicketFormProps) {
                 onValueChange={(value) =>
                   setFormData({ ...formData, status: value })
                 }
+                disabled={!canEditStatus || isLoadingUser}
               >
                 <SelectTrigger id="status">
                   <SelectValue />
