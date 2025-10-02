@@ -132,7 +132,7 @@ function DragHandle({ id }: { id: string }) {
       className="text-muted-foreground size-7 hover:bg-transparent"
     >
       <IconGripVertical className="text-muted-foreground size-3" />
-      <span className="sr-only">Drag to reorder</span>
+      <span className="sr-only">Kéo để sắp xếp lại</span>
     </Button>
   );
 }
@@ -153,7 +153,7 @@ const columns: ColumnDef<z.infer<typeof teamSchema>>[] = [
             (table.getIsSomePageRowsSelected() && "indeterminate")
           }
           onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-          aria-label="Select all"
+          aria-label="Chọn tất cả"
         />
       </div>
     ),
@@ -162,7 +162,7 @@ const columns: ColumnDef<z.infer<typeof teamSchema>>[] = [
         <Checkbox
           checked={row.getIsSelected()}
           onCheckedChange={(value) => row.toggleSelected(!!value)}
-          aria-label="Select row"
+          aria-label="Chọn hàng"
         />
       </div>
     ),
@@ -548,7 +548,7 @@ export function TeamTable({
             size="sm"
             id="view-selector"
           >
-            <SelectValue placeholder="Select a view" />
+            <SelectValue placeholder="Chọn chế độ xem" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="team-list">DS Nhân viên</SelectItem>
@@ -696,7 +696,7 @@ export function TeamTable({
                       colSpan={columns.length}
                       className="h-24 text-center"
                     >
-                      No team members found.
+                      Không tìm thấy thành viên.
                     </TableCell>
                   </TableRow>
                 )}
@@ -940,7 +940,7 @@ function TeamMemberModal({
                 onChange={(e) =>
                   setFormData({ ...formData, full_name: e.target.value })
                 }
-                placeholder="Enter full name"
+                placeholder="Nhập họ và tên"
                 required
               />
             </div>
@@ -953,7 +953,7 @@ function TeamMemberModal({
                 onChange={(e) =>
                   setFormData({ ...formData, email: e.target.value })
                 }
-                placeholder="Enter email address"
+                placeholder="Nhập địa chỉ email"
                 required
               />
             </div>
@@ -967,7 +967,7 @@ function TeamMemberModal({
                   onChange={(e) =>
                     setFormData({ ...formData, password: e.target.value })
                   }
-                  placeholder="Enter password (min 6 characters)"
+                  placeholder="Nhập mật khẩu (tối thiểu 6 ký tự)"
                   minLength={6}
                   required
                 />
@@ -981,7 +981,7 @@ function TeamMemberModal({
                 onChange={(e) =>
                   setFormData({ ...formData, avatar_url: e.target.value })
                 }
-                placeholder="Enter avatar URL (optional)"
+                placeholder="Nhập URL avatar (tùy chọn)"
               />
             </div>
             <div className="flex flex-col gap-3">
@@ -994,7 +994,7 @@ function TeamMemberModal({
                 disabled={!isCurrentUserAdmin}
               >
                 <SelectTrigger id="roles" className="w-full">
-                  <SelectValue placeholder="Select role" />
+                  <SelectValue placeholder="Chọn vai trò" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="admin">Admin</SelectItem>
@@ -1018,7 +1018,7 @@ function TeamMemberModal({
                 }
               >
                 <SelectTrigger id="is_active" className="w-full">
-                  <SelectValue placeholder="Select status" />
+                  <SelectValue placeholder="Chọn trạng thái" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="active">Active</SelectItem>

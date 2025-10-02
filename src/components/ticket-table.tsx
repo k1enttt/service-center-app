@@ -31,9 +31,12 @@ import {
   IconCheck,
   IconClock,
   IconX,
+  IconMessageCircle,
+  IconPhoto,
 } from "@tabler/icons-react";
 import { useRouter } from "next/navigation";
 import { trpc } from "@/components/providers/trpc-provider";
+import { STATUS_FLOW } from "@/lib/constants/ticket-status";
 import {
   type ColumnDef,
   type ColumnFiltersState,
@@ -84,6 +87,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { QuickCommentModal } from "@/components/quick-comment-modal";
+import { QuickUploadImagesModal } from "@/components/quick-upload-images-modal";
 
 const ticketStatusEnum = z.enum(["open", "in_progress", "resolved", "closed"]);
 const ticketPriorityEnum = z.enum(["low", "medium", "high", "urgent"]);
@@ -123,7 +128,7 @@ function DragHandle({ id }: { id: string }) {
       className="text-muted-foreground size-7 hover:bg-transparent"
     >
       <IconGripVertical className="text-muted-foreground size-3" />
-      <span className="sr-only">Drag to reorder</span>
+      <span className="sr-only">Kéo để sắp xếp lại</span>
     </Button>
   );
 }
@@ -264,7 +269,7 @@ function DataTable<TData extends { id: string }, TValue>({
                   colSpan={columns.length}
                   className="h-24 text-center"
                 >
-                  No tickets found.
+                  Không tìm thấy phiếu dịch vụ.
                 </TableCell>
               </TableRow>
             )}
@@ -281,7 +286,7 @@ interface TicketTableProps {
 
 export function TicketTable({ data: initialData }: TicketTableProps) {
   const router = useRouter();
-  const [data, _setData] = React.useState(() => initialData);
+  const [data, setData] = React.useState(() => initialData);
   const [searchValue, setSearchValue] = React.useState("");
   const [rowSelection, setRowSelection] = React.useState({});
   const [columnVisibility, setColumnVisibility] =
@@ -290,6 +295,10 @@ export function TicketTable({ data: initialData }: TicketTableProps) {
     [],
   );
   const [sorting, setSorting] = React.useState<SortingState>([]);
+  const [commentModalOpen, setCommentModalOpen] = React.useState(false);
+  const [selectedTicketForComment, setSelectedTicketForComment] = React.useState<{ id: string; ticket_number: string } | null>(null);
+  const [uploadModalOpen, setUploadModalOpen] = React.useState(false);
+  const [selectedTicketForUpload, setSelectedTicketForUpload] = React.useState<{ id: string; ticket_number: string } | null>(null);
   const sortableId = React.useId();
   const sensors = useSensors(
     useSensor(MouseSensor, {}),
@@ -297,15 +306,73 @@ export function TicketTable({ data: initialData }: TicketTableProps) {
     useSensor(KeyboardSensor, {}),
   );
 
+  // Update data when initialData changes
+  React.useEffect(() => {
+    setData(initialData);
+  }, [initialData]);
+
   const updateStatusMutation = trpc.tickets.updateTicketStatus.useMutation({
-    onSuccess: () => {
+    onSuccess: (result, variables) => {
       toast.success("Cập nhật trạng thái thành công");
+
+      // Optimistically update the UI
+      setData((prevData) =>
+        prevData.map((ticket) =>
+          ticket.id === variables.id
+            ? {
+                ...ticket,
+                status: mapDatabaseStatusToUI(variables.status),
+              }
+            : ticket
+        )
+      );
+
+      // Also refresh from server
       router.refresh();
     },
     onError: (error) => {
       toast.error(`Lỗi: ${error.message}`);
     },
   });
+
+  // Helper to map database status back to UI status
+  const mapDatabaseStatusToUI = (dbStatus: string): "open" | "in_progress" | "resolved" | "closed" => {
+    switch (dbStatus) {
+      case "pending":
+        return "open";
+      case "in_progress":
+        return "in_progress";
+      case "completed":
+        return "resolved";
+      case "cancelled":
+        return "closed";
+      default:
+        return "open";
+    }
+  };
+
+  // Helper to map UI status to database status
+  const mapUIStatusToDatabase = (uiStatus: string): "pending" | "in_progress" | "completed" | "cancelled" => {
+    switch (uiStatus) {
+      case "open":
+        return "pending";
+      case "in_progress":
+        return "in_progress";
+      case "resolved":
+        return "completed";
+      case "closed":
+        return "cancelled";
+      default:
+        return "pending";
+    }
+  };
+
+  // Get valid next statuses for a ticket
+  const getValidNextStatuses = (currentStatus: string): Array<"pending" | "in_progress" | "completed" | "cancelled"> => {
+    const dbStatus = mapUIStatusToDatabase(currentStatus);
+    const statusFlow = STATUS_FLOW[dbStatus as keyof typeof STATUS_FLOW];
+    return [...(statusFlow?.next || [])] as Array<"pending" | "in_progress" | "completed" | "cancelled">;
+  };
 
   // Show empty state
   if (!data || data.length === 0) {
@@ -316,6 +383,10 @@ export function TicketTable({ data: initialData }: TicketTableProps) {
           <p className="mb-4 mt-2 text-sm text-muted-foreground">
             Tạo phiếu dịch vụ đầu tiên để bắt đầu quản lý công việc.
           </p>
+          <Button onClick={() => router.push('/tickets/add')}>
+            <IconPlus className="h-4 w-4" />
+            Tạo phiếu dịch vụ
+          </Button>
         </div>
       </div>
     );
@@ -332,6 +403,22 @@ export function TicketTable({ data: initialData }: TicketTableProps) {
   const handleAssign = (ticket: Ticket) => {
     toast.success(`Phân công phiếu dịch vụ: ${ticket.ticket_number}`);
     // TODO: Implement reassign dialog
+  };
+
+  const handleComment = (ticket: Ticket) => {
+    setSelectedTicketForComment({
+      id: ticket.id,
+      ticket_number: ticket.ticket_number,
+    });
+    setCommentModalOpen(true);
+  };
+
+  const handleUploadImages = (ticket: Ticket) => {
+    setSelectedTicketForUpload({
+      id: ticket.id,
+      ticket_number: ticket.ticket_number,
+    });
+    setUploadModalOpen(true);
   };
 
   const handleStatusChange = (ticketId: string, newStatus: "pending" | "in_progress" | "completed" | "cancelled") => {
@@ -407,7 +494,7 @@ export function TicketTable({ data: initialData }: TicketTableProps) {
             onCheckedChange={(value) =>
               table.toggleAllPageRowsSelected(!!value)
             }
-            aria-label="Select all"
+            aria-label="Chọn tất cả"
           />
         </div>
       ),
@@ -416,7 +503,7 @@ export function TicketTable({ data: initialData }: TicketTableProps) {
           <Checkbox
             checked={row.getIsSelected()}
             onCheckedChange={(value) => row.toggleSelected(!!value)}
-            aria-label="Select row"
+            aria-label="Chọn hàng"
           />
         </div>
       ),
@@ -534,25 +621,48 @@ export function TicketTable({ data: initialData }: TicketTableProps) {
                     Đổi trạng thái
                   </DropdownMenuSubTrigger>
                   <DropdownMenuSubContent>
-                    <DropdownMenuItem onClick={() => handleStatusChange(ticket.id, "pending")}>
-                      {getStatusIcon("pending")}
-                      Chờ xử lý
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleStatusChange(ticket.id, "in_progress")}>
-                      {getStatusIcon("in_progress")}
-                      Đang xử lý
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleStatusChange(ticket.id, "completed")}>
-                      {getStatusIcon("completed")}
-                      Hoàn thành
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleStatusChange(ticket.id, "cancelled")}>
-                      {getStatusIcon("cancelled")}
-                      Đã hủy
-                    </DropdownMenuItem>
+                    {(() => {
+                      const validNextStatuses = getValidNextStatuses(ticket.status);
+                      const statusOptions: Array<{ value: "pending" | "in_progress" | "completed" | "cancelled", icon: string, label: string }> = [
+                        { value: "pending", icon: "pending", label: "Chờ xử lý" },
+                        { value: "in_progress", icon: "in_progress", label: "Đang xử lý" },
+                        { value: "completed", icon: "completed", label: "Hoàn thành" },
+                        { value: "cancelled", icon: "cancelled", label: "Đã hủy" },
+                      ];
+
+                      const filteredOptions = statusOptions.filter(option =>
+                        validNextStatuses.includes(option.value)
+                      );
+
+                      if (filteredOptions.length === 0) {
+                        return (
+                          <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                            Không thể thay đổi trạng thái
+                          </div>
+                        );
+                      }
+
+                      return filteredOptions.map(option => (
+                        <DropdownMenuItem
+                          key={option.value}
+                          onClick={() => handleStatusChange(ticket.id, option.value)}
+                        >
+                          {getStatusIcon(option.icon)}
+                          {option.label}
+                        </DropdownMenuItem>
+                      ));
+                    })()}
                   </DropdownMenuSubContent>
                 </DropdownMenuSub>
                 <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => handleComment(ticket)}>
+                  <IconMessageCircle className="h-4 w-4 mr-2" />
+                  Thêm bình luận
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleUploadImages(ticket)}>
+                  <IconPhoto className="h-4 w-4 mr-2" />
+                  Tải ảnh lên
+                </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => handleAssign(ticket)}>
                   <IconUserCheck className="h-4 w-4 mr-2" />
                   Phân công lại
@@ -634,7 +744,7 @@ export function TicketTable({ data: initialData }: TicketTableProps) {
             size="sm"
             id="view-selector"
           >
-            <SelectValue placeholder="Select a view" />
+            <SelectValue placeholder="Chọn chế độ xem" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="tickets-list">Danh sách ticket</SelectItem>
@@ -754,6 +864,26 @@ export function TicketTable({ data: initialData }: TicketTableProps) {
           </div>
         </div>
       </TabsContent>
+
+      {/* Quick Comment Modal */}
+      {selectedTicketForComment && (
+        <QuickCommentModal
+          open={commentModalOpen}
+          onOpenChange={setCommentModalOpen}
+          ticketId={selectedTicketForComment.id}
+          ticketNumber={selectedTicketForComment.ticket_number}
+        />
+      )}
+
+      {/* Quick Upload Images Modal */}
+      {selectedTicketForUpload && (
+        <QuickUploadImagesModal
+          open={uploadModalOpen}
+          onOpenChange={setUploadModalOpen}
+          ticketId={selectedTicketForUpload.id}
+          ticketNumber={selectedTicketForUpload.ticket_number}
+        />
+      )}
     </Tabs>
   );
 }
