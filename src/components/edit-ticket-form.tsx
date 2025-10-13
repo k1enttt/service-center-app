@@ -676,7 +676,7 @@ export function EditTicketForm({ ticket }: EditTicketFormProps) {
                 onValueChange={(value) =>
                   setFormData({ ...formData, status: value })
                 }
-                disabled={!canEditStatus || isLoadingUser}
+                disabled={isLoadingUser}
               >
                 <SelectTrigger id="status">
                   <SelectValue />

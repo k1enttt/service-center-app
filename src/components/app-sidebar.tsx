@@ -22,7 +22,6 @@ import { NavMain } from "@/components/nav-main";
 import { NavSecondary } from "@/components/nav-secondary";
 import { NavUser } from "@/components/nav-user";
 import { SidebarSkeleton } from "@/components/sidebar-skeleton";
-import { trpc } from "@/components/providers/trpc-provider";
 import {
   Sidebar,
   SidebarContent,
