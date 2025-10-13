@@ -556,7 +556,7 @@ export function PartsTable({
       </div>
       <TabsContent
         value="parts-list"
-        className="relative flex flex-col gap-4 overflow-auto px-4 lg:px-6"
+        className="relative flex flex-col gap-4 px-4 lg:px-6"
       >
         <div className="flex items-center gap-2">
           <Input
@@ -625,7 +625,7 @@ export function PartsTable({
           <div className="flex w-full items-center gap-8 lg:w-fit">
             <div className="hidden items-center gap-2 lg:flex">
               <Label htmlFor="rows-per-page" className="text-sm font-medium">
-                Hàng trên trang
+                Số hàng trên trang
               </Label>
               <Select
                 value={`${table.getState().pagination.pageSize}`}
@@ -648,7 +648,7 @@ export function PartsTable({
               </Select>
             </div>
             <div className="flex w-fit items-center justify-center text-sm font-medium">
-              Trang {table.getState().pagination.pageIndex + 1} của{" "}
+              Trang {table.getState().pagination.pageIndex + 1} trên{" "}
               {table.getPageCount()}
             </div>
             <div className="ml-auto flex items-center gap-2 lg:ml-0">
@@ -1006,11 +1006,11 @@ function PartsModal({ part, mode, trigger, onSuccess }: PartsModalProps) {
               <>
                 <Separator />
                 <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
+                  <div className="space-y-1">
                     <Label className="text-muted-foreground">ID Linh kiện</Label>
                     <div className="font-mono text-xs">{part.id}</div>
                   </div>
-                  <div>
+                  <div className="space-y-1">
                     <Label className="text-muted-foreground">Giá bán</Label>
                     <div>
                       {new Intl.NumberFormat("vi-VN", {
@@ -1019,7 +1019,7 @@ function PartsModal({ part, mode, trigger, onSuccess }: PartsModalProps) {
                       }).format(part.price)}
                     </div>
                   </div>
-                  <div>
+                  <div className="space-y-1">
                     <Label className="text-muted-foreground">Giá vốn</Label>
                     <div>
                       {new Intl.NumberFormat("vi-VN", {
@@ -1028,7 +1028,7 @@ function PartsModal({ part, mode, trigger, onSuccess }: PartsModalProps) {
                       }).format(part.cost_price)}
                     </div>
                   </div>
-                  <div>
+                  <div className="space-y-1">
                     <Label className="text-muted-foreground">
                       Số lượng tồn kho
                     </Label>
@@ -1051,7 +1051,7 @@ function PartsModal({ part, mode, trigger, onSuccess }: PartsModalProps) {
                       </span>
                     </div>
                   </div>
-                  <div>
+                  <div className="space-y-1">
                     <Label className="text-muted-foreground">Giá trị tồn kho</Label>
                     <div>
                       {new Intl.NumberFormat("vi-VN", {
@@ -1060,7 +1060,7 @@ function PartsModal({ part, mode, trigger, onSuccess }: PartsModalProps) {
                       }).format(part.cost_price * part.stock_quantity)}
                     </div>
                   </div>
-                  <div>
+                  <div className="space-y-1">
                     <Label className="text-muted-foreground">
                       Tỷ lệ lợi nhuận
                     </Label>
@@ -1087,11 +1087,11 @@ function PartsModal({ part, mode, trigger, onSuccess }: PartsModalProps) {
                       )}
                     </div>
                   </div>
-                  <div>
+                  <div className="space-y-1">
                     <Label className="text-muted-foreground">Ngày tạo</Label>
                     <div>{new Date(part.created_at).toLocaleDateString()}</div>
                   </div>
-                  <div>
+                  <div className="space-y-1">
                     <Label className="text-muted-foreground">Ngày cập nhật</Label>
                     <div>{new Date(part.updated_at).toLocaleDateString()}</div>
                   </div>
@@ -1115,7 +1115,7 @@ function PartsModal({ part, mode, trigger, onSuccess }: PartsModalProps) {
           </Button>
           <DrawerClose asChild>
             <Button variant="outline" disabled={isLoading}>
-              Hủy
+              Hủy bỏ
             </Button>
           </DrawerClose>
         </DrawerFooter>

@@ -77,6 +77,31 @@ const updateTicketSchema = z.object({
 });
 
 export const ticketsRouter = router({
+  getDailyRevenue: publicProcedure.query(async ({ ctx }) => {
+    const { data: tickets, error } = await ctx.supabaseAdmin
+      .from("service_tickets")
+      .select("created_at, total_cost")
+      .eq("status", "completed")
+      .order("created_at", { ascending: true });
+
+    if (error) {
+      throw new Error(`Failed to fetch tickets revenue: ${error.message}`);
+    }
+
+    // Group by date and calculate total revenue
+    const dailyRevenue = tickets?.reduce((acc: Record<string, number>, ticket) => {
+      const date = new Date(ticket.created_at).toISOString().split("T")[0];
+      acc[date] = (acc[date] || 0) + (ticket.total_cost || 0);
+      return acc;
+    }, {}) || {};
+
+    // Convert to array format for chart
+    return Object.entries(dailyRevenue).map(([date, revenue]) => ({
+      date,
+      revenue
+    }));
+  }),
+
   createTicket: publicProcedure
     .input(createTicketSchema)
     .mutation(async ({ input, ctx }) => {
@@ -331,10 +356,10 @@ export const ticketsRouter = router({
         .from("service_ticket_comments")
         .select(`
           *,
-          profiles!service_ticket_comments_created_by_fkey (
+          profiles:created_by (
             id,
-            name,
-            role
+            full_name,
+            roles
           )
         `)
         .eq("ticket_id", input.id)
@@ -993,10 +1018,10 @@ ${changes.join('\n')}
         })
         .select(`
           *,
-          profiles!service_ticket_comments_created_by_fkey (
+          profiles:created_by (
             id,
-            name,
-            role
+            full_name,
+            roles
           )
         `)
         .single();

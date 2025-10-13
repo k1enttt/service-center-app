@@ -21,6 +21,8 @@ import { NavDocuments } from "@/components/nav-documents";
 import { NavMain } from "@/components/nav-main";
 import { NavSecondary } from "@/components/nav-secondary";
 import { NavUser } from "@/components/nav-user";
+import { SidebarSkeleton } from "@/components/sidebar-skeleton";
+import { trpc } from "@/components/providers/trpc-provider";
 import {
   Sidebar,
   SidebarContent,
@@ -31,7 +33,19 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 
-const data = {
+type UserRole = "admin" | "manager" | "technician" | "reception";
+
+interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {}
+
+function getUserPrimaryRole(roles: string[]): UserRole {
+  // Hierarchy: admin > manager > technician > reception
+  if (roles.includes("admin")) return "admin";
+  if (roles.includes("manager")) return "manager";
+  if (roles.includes("technician")) return "technician";
+  return "reception";
+}
+
+const baseData = {
   navMain: [
     {
       title: "Dashboard",
@@ -71,47 +85,52 @@ const data = {
       name: "Sản phẩm dịch vụ",
       url: "/products",
       icon: IconDevices,
+      allowedRoles: ["admin", "manager"] as UserRole[],
     },
     {
       name: "Kho linh kiện",
       url: "/parts",
       icon: IconComponents,
+      allowedRoles: ["admin", "manager"] as UserRole[],
     },
     {
       name: "Quản lý nhãn hàng (TODOS)",
       url: "/brands",
       icon: IconComponents,
+      allowedRoles: ["admin", "manager", "technician", "reception"] as UserRole[],
     },
     {
       name: "Quản lý nhân sự",
       url: "/team",
       icon: IconUsers,
+      allowedRoles: ["admin"] as UserRole[],
     },
     {
       name: "Báo cáo (TODOS)",
       url: "/report",
       icon: IconReport,
+      allowedRoles: ["admin", "manager", "technician", "reception"] as UserRole[],
     },
   ],
 };
 
-export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
-  const { data: currentUser } = trpc.profile.getCurrentUser.useQuery();
+function getFilteredData(userRole: UserRole = "reception") {
+  return {
+    ...baseData,
+    documents: baseData.documents.filter((item) =>
+      item.allowedRoles.includes(userRole)
+    ),
+  };
+}
+
+export function AppSidebar({ ...props }: AppSidebarProps) {
+  // Fetch current user profile to get roles
+  const { data: profile, isLoading } = trpc.profile.getCurrentUser.useQuery();
   
-  // Check if user is admin or manager
-  const isAdminOrManager = currentUser?.roles?.some((role: string) => 
-    role === 'admin' || role === 'manager'
-  ) ?? false;
-
-  // Filter documents based on user role
-  const filteredDocuments = data.documents.filter(doc => {
-    // Hide "Sản phẩm dịch vụ" and "Kho linh kiện" for non-admin/manager users
-    if (!isAdminOrManager && (doc.url === '/products' || doc.url === '/parts')) {
-      return false;
-    }
-    return true;
-  });
-
+  // Determine user role from profile
+  const userRole = profile?.roles ? getUserPrimaryRole(profile.roles) : "reception";
+  
+  const data = getFilteredData(userRole);
   return (
     <Sidebar collapsible="offcanvas" {...props}>
       <SidebarHeader>
@@ -132,9 +151,15 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={data.navMain} />
-        <NavDocuments items={filteredDocuments} />
-        <NavSecondary items={data.navSecondary} className="mt-auto" />
+        {isLoading ? (
+          <SidebarSkeleton />
+        ) : (
+          <>
+            <NavMain items={data.navMain} />
+            <NavDocuments items={data.documents} />
+            <NavSecondary items={data.navSecondary} className="mt-auto" />
+          </>
+        )}
       </SidebarContent>
       <SidebarFooter>
         <NavUser />

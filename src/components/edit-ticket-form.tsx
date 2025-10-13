@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   Card,
@@ -22,7 +22,9 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { trpc } from "@/components/providers/trpc-provider";
-import { IconTrash, IconPlus, IconEdit, IconPhoto, IconX, IconDownload } from "@tabler/icons-react";
+import { IconTrash, IconPlus, IconEdit, IconPhoto, IconX, IconDownload, IconEye, IconUser, IconClipboardText, IconCurrencyDollar, IconTool, IconMinus } from "@tabler/icons-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { NumberCounter } from "@/components/number-counter";
 import { STATUS_FLOW } from "@/lib/constants/ticket-status";
 import { createClient } from "@/utils/supabase/client";
 
@@ -44,6 +46,10 @@ export function EditTicketForm({ ticket }: EditTicketFormProps) {
     discount_amount: ticket.discount_amount || 0,
     notes: ticket.notes || "",
   });
+
+  // Track form changes for unsaved changes warning
+  const [originalData, setOriginalData] = useState(formData);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   const [parts, setParts] = useState(
     ticket.service_ticket_parts?.map((item: any) => ({
@@ -72,88 +78,243 @@ export function EditTicketForm({ ticket }: EditTicketFormProps) {
   const [isUploading, setIsUploading] = useState(false);
   const { data: attachments, refetch: refetchAttachments } = trpc.tickets.getAttachments.useQuery({ ticket_id: ticket.id });
 
-  // Check if user has permission to manage parts (technician, manager, admin)
-  const canManageParts =
-    currentUser?.roles?.some(
-      (role: string) =>
-        role === "technician" || role === "manager" || role === "admin"
-    ) ?? false;
+  // Image view modal state
+  const [viewingImage, setViewingImage] = useState<{ url: string; name: string } | null>(null);
 
-  // Check if user has permission to edit ticket status (admin, manager, technician)
-  const canEditStatus =
-    currentUser?.roles?.some(
-      (role: string) =>
-        role === "admin" || role === "manager" || role === "technician"
-    ) ?? false;
+  // Track form changes to detect unsaved changes
+  useEffect(() => {
+    const isChanged = JSON.stringify(formData) !== JSON.stringify(originalData);
+    setHasUnsavedChanges(isChanged);
+  }, [formData, originalData]);
 
-  const updateTicketMutation = trpc.tickets.updateTicket.useMutation({
+  // Unsaved changes warning for browser events only
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+      }
+    };
+
+    if (hasUnsavedChanges) {
+      // Only listen for browser back/forward and refresh
+      window.addEventListener('beforeunload', handleBeforeUnload);
+    }
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [hasUnsavedChanges]);
+
+  // Helper function to check unsaved changes before navigation
+  const checkUnsavedChanges = (): boolean => {
+    if (hasUnsavedChanges) {
+      return confirm('Bạn có thay đổi chưa lưu. Bạn có chắc muốn rời khỏi trang?');
+    }
+    return true;
+  };
+
+  // Safe navigation wrapper for Next.js router - handles internal navigation
+  const navigateWithCheck = (path: string) => {
+    if (checkUnsavedChanges()) {
+      router.push(path);
+    }
+  };
+
+  const updateTicketDetailsMutation = trpc.tickets.updateTicket.useMutation({
     onSuccess: () => {
-      toast.success("Cập nhật phiếu dịch vụ thành công");
-      router.push(`/tickets/${ticket.id}`);
-      router.refresh();
+      console.log("[EditTicketForm] Update ticket details success:", {
+        ticketId: ticket.id,
+        ticketNumber: ticket.ticket_number,
+        timestamp: new Date().toISOString(),
+      });
+      toast.success("Đã lưu chi tiết phiếu dịch vụ thành công");
+      // Reset original data after successful save
+      setOriginalData(formData);
     },
     onError: (error) => {
-      toast.error(`Lỗi: ${error.message}`);
+      console.error("[EditTicketForm] Update ticket details error:", {
+        ticketId: ticket.id,
+        error: error.message,
+        errorData: error.data,
+        timestamp: new Date().toISOString(),
+      });
+      toast.error(`Lỗi khi lưu chi tiết phiếu dịch vụ: ${error.message}`);
+    },
+  });
+
+  const updateServiceFeesMutation = trpc.tickets.updateTicket.useMutation({
+    onSuccess: () => {
+      console.log("[EditTicketForm] Update service fees success:", {
+        ticketId: ticket.id,
+        ticketNumber: ticket.ticket_number,
+        timestamp: new Date().toISOString(),
+      });
+      toast.success("Đã lưu thông tin chi phí dịch vụ thành công");
+      // Reset original data after successful save
+      setOriginalData(formData);
+    },
+    onError: (error) => {
+      console.error("[EditTicketForm] Update service fees error:", {
+        ticketId: ticket.id,
+        error: error.message,
+        errorData: error.data,
+        timestamp: new Date().toISOString(),
+      });
+      toast.error(`Lỗi khi lưu chi phí dịch vụ: ${error.message}`);
     },
   });
 
   const addPartMutation = trpc.tickets.addTicketPart.useMutation({
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log("[EditTicketForm] Add part success:", {
+        ticketId: ticket.id,
+        partId: selectedNewPart,
+        quantity: newPartQuantity,
+        addedPartData: data,
+        timestamp: new Date().toISOString(),
+      });
+
+      // Update local parts state immediately
+      const part = availableParts?.find(p => p.id === selectedNewPart);
+      if (part && data.part) {
+        setParts((prev: any[]) => [...prev, {
+          id: data.part.id,
+          part_id: selectedNewPart,
+          part_name: part.name,
+          quantity: newPartQuantity,
+          unit_price: part.price,
+          total_price: part.price * newPartQuantity,
+        }]);
+      }
+
       toast.success("Thêm linh kiện thành công");
-      router.refresh();
       setSelectedNewPart("");
       setNewPartQuantity(1);
+      router.refresh();
     },
     onError: (error) => {
+      console.error("[EditTicketForm] Add part error:", {
+        ticketId: ticket.id,
+        partId: selectedNewPart,
+        error: error.message,
+        errorData: error.data,
+        timestamp: new Date().toISOString(),
+      });
       toast.error(`Lỗi: ${error.message}`);
     },
   });
 
   const updatePartMutation = trpc.tickets.updateTicketPart.useMutation({
-    onSuccess: () => {
+    onSuccess: (data, variables) => {
+      console.log("[EditTicketForm] Update part success:", {
+        ticketId: ticket.id,
+        ticketPartId: editingPartId,
+        updatedData: variables,
+        timestamp: new Date().toISOString(),
+      });
+
+      // Update local parts state immediately
+      if (editingPartId && editingPartData) {
+        setParts((prev: any[]) => prev.map(part =>
+          part.id === editingPartId
+            ? {
+                ...part,
+                quantity: editingPartData.quantity,
+                unit_price: editingPartData.unit_price,
+                total_price: editingPartData.quantity * editingPartData.unit_price,
+              }
+            : part
+        ));
+      }
+
       toast.success("Cập nhật linh kiện thành công");
       setEditingPartId(null);
       setEditingPartData(null);
       router.refresh();
     },
     onError: (error) => {
+      console.error("[EditTicketForm] Update part error:", {
+        ticketId: ticket.id,
+        ticketPartId: editingPartId,
+        error: error.message,
+        errorData: error.data,
+        timestamp: new Date().toISOString(),
+      });
       toast.error(`Lỗi: ${error.message}`);
     },
   });
 
   const deletePartMutation = trpc.tickets.deleteTicketPart.useMutation({
-    onSuccess: () => {
+    onSuccess: (data, variables) => {
+      console.log("[EditTicketForm] Delete part success:", {
+        ticketId: ticket.id,
+        ticketPartId: variables.id,
+        timestamp: new Date().toISOString(),
+      });
+
+      // Update local parts state immediately
+      setParts((prev: any[]) => prev.filter(part => part.id !== variables.id));
+
       toast.success("Xóa linh kiện thành công");
       router.refresh();
     },
-    onError: (error) => {
+    onError: (error, variables) => {
+      console.error("[EditTicketForm] Delete part error:", {
+        ticketId: ticket.id,
+        ticketPartId: variables.id,
+        error: error.message,
+        errorData: error.data,
+        timestamp: new Date().toISOString(),
+      });
       toast.error(`Lỗi: ${error.message}`);
     },
   });
 
   const addAttachmentMutation = trpc.tickets.addAttachment.useMutation({
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log("[EditTicketForm] Add attachment success:", {
+        ticketId: ticket.id,
+        attachmentId: data.attachment?.id,
+        attachmentData: data,
+        timestamp: new Date().toISOString(),
+      });
       refetchAttachments();
     },
     onError: (error) => {
+      console.error("[EditTicketForm] Add attachment error:", {
+        ticketId: ticket.id,
+        error: error.message,
+        errorData: error.data,
+        timestamp: new Date().toISOString(),
+      });
       toast.error(`Lỗi khi lưu thông tin ảnh: ${error.message}`);
     },
   });
 
   const deleteAttachmentMutation = trpc.tickets.deleteAttachment.useMutation({
-    onSuccess: () => {
+    onSuccess: (data, variables) => {
+      console.log("[EditTicketForm] Delete attachment success:", {
+        ticketId: ticket.id,
+        attachmentId: variables.id,
+        timestamp: new Date().toISOString(),
+      });
       toast.success("Xóa ảnh thành công");
       refetchAttachments();
     },
-    onError: (error) => {
+    onError: (error, variables) => {
+      console.error("[EditTicketForm] Delete attachment error:", {
+        ticketId: ticket.id,
+        attachmentId: variables.id,
+        error: error.message,
+        errorData: error.data,
+        timestamp: new Date().toISOString(),
+      });
       toast.error(`Lỗi: ${error.message}`);
     },
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-
-    updateTicketMutation.mutate({
+  const handleSaveTicketDetails = () => {
+    updateTicketDetailsMutation.mutate({
       id: ticket.id,
       issue_description: formData.issue_description,
       priority_level: formData.priority_level as
@@ -162,24 +323,31 @@ export function EditTicketForm({ ticket }: EditTicketFormProps) {
         | "high"
         | "urgent",
       warranty_type: formData.warranty_type as "warranty" | "paid" | "goodwill",
-      status: formData.status as
-        | "pending"
-        | "in_progress"
-        | "completed"
-        | "cancelled",
-      service_fee: Number(formData.service_fee),
-      diagnosis_fee: Number(formData.diagnosis_fee),
-      discount_amount: Number(formData.discount_amount),
+      status: formData.status as "pending" | "in_progress" | "completed" | "cancelled",
       notes: formData.notes || null,
     });
   };
 
+  const handleSaveServiceFees = () => {
+    updateServiceFeesMutation.mutate({
+      id: ticket.id,
+      service_fee: Number(formData.service_fee),
+      diagnosis_fee: Number(formData.diagnosis_fee),
+      discount_amount: Number(formData.discount_amount),
+    });
+  };
+
   const handleCancel = () => {
-    router.push(`/tickets/${ticket.id}`);
+    // Use safe navigation with unsaved changes check
+    navigateWithCheck(`/tickets/${ticket.id}`);
   };
 
   const handleAddPart = () => {
     if (!selectedNewPart) {
+      console.warn("[EditTicketForm] Add part validation failed: No part selected", {
+        ticketId: ticket.id,
+        timestamp: new Date().toISOString(),
+      });
       toast.error("Vui lòng chọn linh kiện");
       return;
     }
@@ -257,6 +425,13 @@ export function EditTicketForm({ ticket }: EditTicketFormProps) {
     const imageFiles = files.filter((file) => file.type.startsWith("image/"));
 
     if (imageFiles.length !== files.length) {
+      console.warn("[EditTicketForm] File type validation:", {
+        ticketId: ticket.id,
+        totalFiles: files.length,
+        imageFiles: imageFiles.length,
+        rejectedCount: files.length - imageFiles.length,
+        timestamp: new Date().toISOString(),
+      });
       toast.warning("Chỉ chấp nhận file ảnh");
     }
 
@@ -270,6 +445,13 @@ export function EditTicketForm({ ticket }: EditTicketFormProps) {
   const handleUploadImages = async () => {
     if (selectedFiles.length === 0) return;
 
+    console.log("[EditTicketForm] Starting image upload:", {
+      ticketId: ticket.id,
+      fileCount: selectedFiles.length,
+      files: selectedFiles.map(f => ({ name: f.name, size: f.size, type: f.type })),
+      timestamp: new Date().toISOString(),
+    });
+
     setIsUploading(true);
 
     try {
@@ -277,6 +459,14 @@ export function EditTicketForm({ ticket }: EditTicketFormProps) {
         const timestamp = Date.now();
         const randomString = Math.random().toString(36).substring(7);
         const filePath = `${ticket.id}/${timestamp}_${randomString}_${file.name}`;
+
+        console.log("[EditTicketForm] Uploading file to storage:", {
+          ticketId: ticket.id,
+          fileName: file.name,
+          filePath,
+          fileSize: file.size,
+          bucket: "service_media",
+        });
 
         const { data: uploadData, error: uploadError } = await supabase.storage
           .from("service_media")
@@ -286,8 +476,20 @@ export function EditTicketForm({ ticket }: EditTicketFormProps) {
           });
 
         if (uploadError) {
+          console.error("[EditTicketForm] Storage upload failed:", {
+            ticketId: ticket.id,
+            fileName: file.name,
+            error: uploadError.message,
+            errorDetails: uploadError,
+          });
           throw new Error(`Upload failed for ${file.name}: ${uploadError.message}`);
         }
+
+        console.log("[EditTicketForm] Storage upload success, saving attachment:", {
+          ticketId: ticket.id,
+          fileName: file.name,
+          storagePath: uploadData.path,
+        });
 
         await addAttachmentMutation.mutateAsync({
           ticket_id: ticket.id,
@@ -302,10 +504,21 @@ export function EditTicketForm({ ticket }: EditTicketFormProps) {
 
       await Promise.all(uploadPromises);
 
+      console.log("[EditTicketForm] All images uploaded successfully:", {
+        ticketId: ticket.id,
+        uploadedCount: selectedFiles.length,
+        timestamp: new Date().toISOString(),
+      });
+
       toast.success(`Đã tải lên ${selectedFiles.length} ảnh thành công`);
       setSelectedFiles([]);
     } catch (error) {
-      console.error("Upload error:", error);
+      console.error("[EditTicketForm] Upload error:", {
+        ticketId: ticket.id,
+        error: error instanceof Error ? error.message : String(error),
+        errorStack: error instanceof Error ? error.stack : undefined,
+        timestamp: new Date().toISOString(),
+      });
       toast.error(error instanceof Error ? error.message : "Lỗi khi tải ảnh lên");
     } finally {
       setIsUploading(false);
@@ -330,43 +543,129 @@ export function EditTicketForm({ ticket }: EditTicketFormProps) {
     Number(formData.discount_amount);
 
   return (
-    <form onSubmit={handleSubmit} className="grid gap-6">
-      {/* Customer and Product Info (Read-only) */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Thông tin cơ bản</CardTitle>
-          <CardDescription>
-            Thông tin khách hàng và sản phẩm (không thể chỉnh sửa)
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-2">
-          <div className="space-y-2">
-            <Label>Khách hàng</Label>
-            <Input value={ticket.customers?.name || ""} disabled />
-          </div>
-          <div className="space-y-2">
-            <Label>Số điện thoại</Label>
-            <Input value={ticket.customers?.phone || ""} disabled />
-          </div>
-          <div className="space-y-2">
-            <Label>Sản phẩm</Label>
-            <Input value={ticket.products?.name || ""} disabled />
-          </div>
-          <div className="space-y-2">
-            <Label>Loại sản phẩm</Label>
-            <Input value={ticket.products?.type || ""} disabled />
-          </div>
-        </CardContent>
-      </Card>
+    <form className="grid gap-6">
+      {/* Customer Info + Ticket Details cùng cột, Fees cùng hàng và chiếm 3 dòng */}
+      <div className="grid gap-6 lg:grid-cols-2 lg:grid-rows-3">
+        {/* Customer and Product Info (Read-only) - dòng 1 */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <IconUser className="h-5 w-5" />
+              Thông tin cơ bản
+            </CardTitle>
+            {/* <CardDescription>Thông tin khách hàng và sản phẩm</CardDescription> */}
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="grid grid-cols-3 gap-4">
+              <div className="text-sm font-medium text-muted-foreground">Khách hàng</div>
+              <div className="text-sm font-medium col-span-2">{ticket.customers?.name || ""}</div>
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="text-sm font-medium text-muted-foreground">Số điện thoại</div>
+              <div className="text-sm font-medium col-span-2">{ticket.customers?.phone || ""}</div>
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="text-sm font-medium text-muted-foreground">Sản phẩm</div>
+              <div className="text-sm font-medium col-span-2">{ticket.products?.name || ""}</div>
+            </div>
+          </CardContent>
+        </Card>
 
-      {/* Ticket Details */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Chi tiết phiếu dịch vụ</CardTitle>
-          <CardDescription>
-            Cập nhật thông tin phiếu dịch vụ {ticket.ticket_number}
-          </CardDescription>
-        </CardHeader>
+        {/* Fees - chiếm 3 dòng */}
+        <Card className="order-3 lg:order-2 lg:row-span-3">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <IconCurrencyDollar className="h-5 w-5" />
+              Chi phí dịch vụ
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="service_fee">Giá dịch vụ (₫)</Label>
+                <Input
+                  id="service_fee"
+                  type="number"
+                  min="0"
+                  step="1000"
+                  value={formData.service_fee}
+                  onChange={(e) => setFormData({ ...formData, service_fee: Number(e.target.value) })}
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="diagnosis_fee">Phí kiểm tra (₫)</Label>
+                <Input
+                  id="diagnosis_fee"
+                  type="number"
+                  min="0"
+                  step="1000"
+                  value={formData.diagnosis_fee}
+                  onChange={(e) => setFormData({ ...formData, diagnosis_fee: Number(e.target.value) })}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="discount_amount">Giảm giá (₫)</Label>
+                <Input
+                  id="discount_amount"
+                  type="number"
+                  min="0"
+                  step="1000"
+                  value={formData.discount_amount}
+                  onChange={(e) => setFormData({ ...formData, discount_amount: Number(e.target.value) })}
+                />
+              </div>
+
+              {/* Cost Summary */}
+              <div className="mt-6 space-y-2 border-t pt-4">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Giá dịch vụ:</span>
+                  <span>{Number(formData.service_fee).toLocaleString("vi-VN")} ₫</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Phí kiểm tra:</span>
+                  <span>{Number(formData.diagnosis_fee).toLocaleString("vi-VN")} ₫</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Linh kiện:</span>
+                  <span>{partsTotal.toLocaleString("vi-VN")} ₫</span>
+                </div>
+                {formData.discount_amount > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Giảm giá:</span>
+                    <span className="text-red-600">-{Number(formData.discount_amount).toLocaleString("vi-VN")} ₫</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-lg font-bold border-t pt-2">
+                  <span>Tổng cộng:</span>
+                  <span className="text-primary">{totalCost.toLocaleString("vi-VN")} ₫</span>
+                </div>
+              </div>
+              </div>
+            </CardContent>
+            {/* Actions for Fees */}
+            <div className="flex justify-end gap-2 px-6">
+              <Button 
+                type="button" 
+                disabled={updateServiceFeesMutation.isPending}
+                onClick={handleSaveServiceFees}
+              >
+                {updateServiceFeesMutation.isPending ? "Đang lưu..." : "Lưu thay đổi"}
+              </Button>
+            </div>
+          </Card>
+
+        {/* Ticket Details - dòng 2 và 3 */}
+        <Card className="order-2 lg:order-3 lg:row-span-2">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <IconClipboardText className="h-5 w-5" />
+              Chi tiết phiếu dịch vụ
+            </CardTitle>
+            {/* <CardDescription>Cập nhật thông tin phiếu dịch vụ {ticket.ticket_number}</CardDescription> */}
+          </CardHeader>
         <CardContent className="space-y-6">
           {/* Status and Priority */}
           <div className="grid gap-4 md:grid-cols-3">
@@ -465,312 +764,167 @@ export function EditTicketForm({ ticket }: EditTicketFormProps) {
             />
           </div>
         </CardContent>
+        {/* Actions for Ticket Details */}
+        <div className="flex justify-end gap-2 px-6">
+          <Button 
+            type="button" 
+            disabled={updateTicketDetailsMutation.isPending}
+            onClick={handleSaveTicketDetails}
+          >
+            {updateTicketDetailsMutation.isPending ? "Đang lưu..." : "Lưu thay đổi"}
+          </Button>
+        </div>
       </Card>
+      </div>
 
-      {/* Fees */}
+      {/* Parts Management */}
       <Card>
         <CardHeader>
-          <CardTitle>Chi phí dịch vụ</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <IconTool className="h-5 w-5" />
+            Quản lý linh kiện
+          </CardTitle>
+          {/* <CardDescription>
+            Thêm, sửa hoặc xóa linh kiện sử dụng trong phiếu dịch vụ
+          </CardDescription> */}
         </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 md:grid-cols-3">
-            <div className="space-y-2">
-              <Label htmlFor="service_fee">Giá dịch vụ (₫)</Label>
-              <Input
-                id="service_fee"
-                type="number"
-                min="0"
-                step="1000"
-                value={formData.service_fee}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    service_fee: Number(e.target.value),
-                  })
-                }
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="diagnosis_fee">Phí kiểm tra (₫)</Label>
-              <Input
-                id="diagnosis_fee"
-                type="number"
-                min="0"
-                step="1000"
-                value={formData.diagnosis_fee}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    diagnosis_fee: Number(e.target.value),
-                  })
-                }
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="discount_amount">Giảm giá (₫)</Label>
-              <Input
-                id="discount_amount"
-                type="number"
-                min="0"
-                step="1000"
-                value={formData.discount_amount}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    discount_amount: Number(e.target.value),
-                  })
-                }
-              />
-            </div>
-          </div>
-
-          {/* Cost Summary */}
-          <div className="mt-6 space-y-2 border-t pt-4">
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Giá dịch vụ:</span>
-              <span>
-                {Number(formData.service_fee).toLocaleString("vi-VN")} ₫
-              </span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Phí kiểm tra:</span>
-              <span>
-                {Number(formData.diagnosis_fee).toLocaleString("vi-VN")} ₫
-              </span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Linh kiện:</span>
-              <span>{partsTotal.toLocaleString("vi-VN")} ₫</span>
-            </div>
-            {formData.discount_amount > 0 && (
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Giảm giá:</span>
-                <span className="text-red-600">
-                  -{Number(formData.discount_amount).toLocaleString("vi-VN")} ₫
-                </span>
+        <CardContent className="space-y-4">
+          {/* Add New Part */}
+          <div className="border rounded-lg p-4 space-y-3">
+            <h4 className="font-medium">Thêm linh kiện mới</h4>
+            <div className="grid gap-3 md:grid-cols-4">
+              <div className="md:col-span-2">
+                <Label htmlFor="new-part" className="mb-2">Linh kiện</Label>
+                <Select value={selectedNewPart} onValueChange={setSelectedNewPart}>
+                  <SelectTrigger id="new-part">
+                    <SelectValue placeholder="Chọn linh kiện" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableParts?.map((part) => (
+                      <SelectItem key={part.id} value={part.id}>
+                        {part.name} - {part.price.toLocaleString("vi-VN")} ₫
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-            )}
-            <div className="flex justify-between text-lg font-bold border-t pt-2">
-              <span>Tổng cộng:</span>
-              <span className="text-primary">
-                {totalCost.toLocaleString("vi-VN")} ₫
-              </span>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Parts Management - Show based on user permissions */}
-      {canManageParts ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>Quản lý linh kiện</CardTitle>
-            <CardDescription>
-              Thêm, sửa hoặc xóa linh kiện sử dụng trong phiếu dịch vụ
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {/* Add New Part */}
-            <div className="border rounded-lg p-4 space-y-3">
-              <h4 className="font-medium">Thêm linh kiện mới</h4>
-              <div className="grid gap-3 md:grid-cols-4">
-                <div className="md:col-span-2">
-                  <Label htmlFor="new-part">Linh kiện</Label>
-                  <Select
-                    value={selectedNewPart}
-                    onValueChange={setSelectedNewPart}
-                  >
-                    <SelectTrigger id="new-part">
-                      <SelectValue placeholder="Chọn linh kiện" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableParts?.map((part) => (
-                        <SelectItem key={part.id} value={part.id}>
-                          {part.name} - {part.price.toLocaleString("vi-VN")} ₫
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="new-quantity">Số lượng</Label>
-                  <Input
-                    id="new-quantity"
-                    type="number"
-                    min="1"
-                    value={newPartQuantity}
-                    onChange={(e) => setNewPartQuantity(Number(e.target.value))}
-                  />
-                </div>
-                <div className="flex items-end">
-                  <Button
-                    type="button"
-                    onClick={handleAddPart}
-                    disabled={addPartMutation.isPending}
-                    className="w-full"
-                  >
-                    <IconPlus className="h-4 w-4 mr-2" />
-                    Thêm
-                  </Button>
-                </div>
-              </div>
-            </div>
-
-            {/* Existing Parts List */}
-            {parts.length > 0 ? (
               <div className="space-y-2">
-                <h4 className="font-medium">Linh kiện đã sử dụng</h4>
-                {parts.map((part: any) => (
-                  <div
-                    key={part.id}
-                    className="flex items-center gap-2 border-b pb-2"
-                  >
-                    {editingPartId === part.id ? (
-                      // Edit mode
-                      <>
-                        <div className="flex-1 grid grid-cols-3 gap-2">
-                          <div>
-                            <p className="text-sm font-medium">
-                              {part.part_name}
-                            </p>
-                          </div>
-                          <div>
-                            <Input
-                              type="number"
-                              min="1"
-                              value={editingPartData?.quantity}
-                              onChange={(e) =>
-                                setEditingPartData({
-                                  ...editingPartData!,
-                                  quantity: Number(e.target.value),
-                                })
-                              }
-                              className="h-8"
-                            />
-                          </div>
-                          <div>
-                            <Input
-                              type="number"
-                              min="0"
-                              value={editingPartData?.unit_price}
-                              onChange={(e) =>
-                                setEditingPartData({
-                                  ...editingPartData!,
-                                  unit_price: Number(e.target.value),
-                                })
-                              }
-                              className="h-8"
-                            />
-                          </div>
+                <Label htmlFor="new-quantity">Số lượng</Label>
+                <NumberCounter
+                  value={newPartQuantity}
+                  onChange={setNewPartQuantity}
+                  min={1}
+                />
+              </div>
+              <div className="flex items-end">
+                <Button
+                  type="button"
+                  onClick={handleAddPart}
+                  disabled={addPartMutation.isPending}
+                  className="w-full"
+                >
+                  <IconPlus className="h-4 w-4" />
+                  Thêm
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          {/* Existing Parts List */}
+          {parts.length > 0 ? (
+            <div className="space-y-2">
+              <h4 className="font-medium">Linh kiện đã sử dụng</h4>
+              {parts.map((part: any) => (
+                <div key={part.id} className="flex items-center gap-2 border-b pb-2">
+                  {editingPartId === part.id ? (
+                    // Edit mode
+                    <>
+                      <div className="flex-1 grid grid-cols-5 gap-2 items-center">
+                        <div className="col-span-3">
+                          <p className="text-sm font-medium">{part.part_name}</p>
                         </div>
-                        <div className="flex gap-1">
-                          <Button
-                            type="button"
-                            size="sm"
-                            onClick={handleSaveEdit}
-                            disabled={updatePartMutation.isPending}
-                          >
-                            Lưu
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            onClick={handleCancelEdit}
-                          >
-                            Hủy
-                          </Button>
+                        <div>
+                          <NumberCounter
+                            value={editingPartData?.quantity || 1}
+                            onChange={(newQuantity) =>
+                              setEditingPartData({
+                                ...editingPartData!,
+                                quantity: newQuantity,
+                              })
+                            }
+                            min={1}
+                          />
                         </div>
-                      </>
-                    ) : (
-                      // View mode
-                      <>
-                        <div className="flex-1">
-                          <p className="font-medium">{part.part_name}</p>
-                          <p className="text-sm text-muted-foreground">
-                            Số lượng: {part.quantity} ×{" "}
-                            {part.unit_price.toLocaleString("vi-VN")} ₫
-                          </p>
-                        </div>
-                        <div className="text-right min-w-[100px]">
+                        <div className="text-right min-w-[100px] mr-2">
                           <p className="font-medium">
                             {part.total_price.toLocaleString("vi-VN")} ₫
                           </p>
                         </div>
-                        <div className="flex gap-1">
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handleStartEdit(part)}
-                          >
-                            <IconEdit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handleDeletePart(part.id)}
-                            disabled={deletePartMutation.isPending}
-                          >
-                            <IconTrash className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground text-center py-4">
-                Chưa có linh kiện nào được sử dụng
-              </p>
-            )}
-          </CardContent>
-        </Card>
-      ) : (
-        // ViewOnlyPartsCard component for users without management permissions
-        <Card>
-          <CardHeader>
-            <CardTitle>Linh kiện đã sử dụng</CardTitle>
-            <CardDescription>
-              Danh sách linh kiện được sử dụng trong phiếu dịch vụ này
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {parts.length > 0 ? (
-              <div className="space-y-2">
-                {parts.map((part: any) => (
-                  <div
-                    key={part.id}
-                    className="flex items-center justify-between border-b pb-2"
-                  >
-                    <div className="flex-1">
-                      <p className="font-medium">{part.part_name}</p>
-                      <p className="text-sm text-muted-foreground">
-                        Số lượng: {part.quantity} ×{" "}
-                        {part.unit_price.toLocaleString("vi-VN")} ₫
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-medium">
-                        {part.total_price.toLocaleString("vi-VN")} ₫
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground text-center py-4">
-                Chưa có linh kiện nào được sử dụng
-              </p>
-            )}
-          </CardContent>
-        </Card>
-      )}
+                      </div>
+                      <div className="flex gap-1">
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={handleSaveEdit}
+                          disabled={updatePartMutation.isPending}
+                        >
+                          Lưu
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={handleCancelEdit}
+                        >
+                          Hủy
+                        </Button>
+                      </div>
+                    </>
+                  ) : (
+                    // View mode
+                    <>
+                      <div className="flex-1">
+                        <p className="font-medium">{part.part_name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          Số lượng: {part.quantity} × {part.unit_price.toLocaleString("vi-VN")} ₫
+                        </p>
+                      </div>
+                      <div className="text-right min-w-[100px]">
+                        <p className="font-medium">
+                          {part.total_price.toLocaleString("vi-VN")} ₫
+                        </p>
+                      </div>
+                      <div className="flex gap-1">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleStartEdit(part)}
+                        >
+                          <IconEdit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleDeletePart(part.id)}
+                          disabled={deletePartMutation.isPending}
+                        >
+                          <IconTrash className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground text-center py-4">
+              Chưa có linh kiện nào được sử dụng
+            </p>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Attachments/Images */}
       <Card>
@@ -792,9 +946,18 @@ export function EditTicketForm({ ticket }: EditTicketFormProps) {
                   <img
                     src={getPublicUrl(attachment.file_path)}
                     alt={attachment.file_name}
-                    className="w-full h-32 object-cover rounded-lg border"
+                    className="w-full h-32 object-cover rounded-lg border cursor-pointer"
+                    onClick={() => setViewingImage({ url: getPublicUrl(attachment.file_path), name: attachment.file_name })}
                   />
                   <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center gap-2">
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="secondary"
+                      onClick={() => setViewingImage({ url: getPublicUrl(attachment.file_path), name: attachment.file_name })}
+                    >
+                      <IconEye className="h-4 w-4" />
+                    </Button>
                     <Button
                       type="button"
                       size="icon"
@@ -891,20 +1054,21 @@ export function EditTicketForm({ ticket }: EditTicketFormProps) {
         </CardContent>
       </Card>
 
-      {/* Actions */}
-      <div className="flex justify-end gap-2">
-        <Button
-          variant="outline"
-          type="button"
-          onClick={handleCancel}
-          disabled={updateTicketMutation.isPending}
-        >
-          Hủy
-        </Button>
-        <Button type="submit" disabled={updateTicketMutation.isPending}>
-          {updateTicketMutation.isPending ? "Đang lưu..." : "Lưu thay đổi"}
-        </Button>
-      </div>
+      {/* Image View Modal */}
+      <Dialog open={!!viewingImage} onOpenChange={(open) => !open && setViewingImage(null)}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>{viewingImage?.name}</DialogTitle>
+          </DialogHeader>
+          <div className="flex items-center justify-center p-4">
+            <img
+              src={viewingImage?.url}
+              alt={viewingImage?.name}
+              className="max-h-[70vh] max-w-full object-contain rounded-lg"
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
     </form>
   );
 }

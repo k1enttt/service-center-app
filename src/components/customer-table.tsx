@@ -474,7 +474,7 @@ export function CustomerTable({ data: initialData }: CustomerTableProps) {
         const customer = row.original;
 
         return (
-          <div className="flex items-center justify-end space-x-2">
+          <div className="flex items-center justify-start space-x-2">
             <CustomerModal
               customer={customer}
               mode="edit"
@@ -640,7 +640,7 @@ export function CustomerTable({ data: initialData }: CustomerTableProps) {
       </div>
       <TabsContent
         value="customers-list"
-        className="relative flex flex-col gap-4 overflow-auto px-4 lg:px-6"
+        className="relative flex flex-col gap-4 px-4 lg:px-6"
       >
         <div className="flex items-center gap-2">
           <Input
@@ -652,7 +652,7 @@ export function CustomerTable({ data: initialData }: CustomerTableProps) {
         </div>
         <DataTable
           columns={columns}
-          data={data}
+          data={filteredData}
           searchValue={searchValue}
           sensors={sensors}
           sortableId={sortableId}
@@ -866,19 +866,19 @@ function CustomerModal({
               <>
                 <div className="border-t pt-4">
                   <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
+                    <div className="space-y-1">
                       <Label className="text-muted-foreground">
                         ID Khách hàng
                       </Label>
                       <div className="font-mono text-xs">{customer.id}</div>
                     </div>
-                    <div>
+                    <div className="space-y-1">
                       <Label className="text-muted-foreground">Ngày tạo</Label>
                       <div>
                         {new Date(customer.created_at).toLocaleDateString()}
                       </div>
                     </div>
-                    <div>
+                    <div className="space-y-1">
                       <Label className="text-muted-foreground">Cập nhật</Label>
                       <div>
                         {new Date(customer.updated_at).toLocaleDateString()}
@@ -908,7 +908,7 @@ function CustomerModal({
           </Button>
           <DrawerClose asChild>
             <Button variant="outline" disabled={isLoading}>
-              Hủy
+              Hủy bỏ
             </Button>
           </DrawerClose>
         </DrawerFooter>
@@ -1017,7 +1017,8 @@ function AddSampleCustomersButton({ onSuccess }: { onSuccess?: () => void }) {
       size="sm"
     >
       <IconDatabase className="h-4 w-4" />
-      {isLoading ? "Đang thêm..." : "Thêm 500 mẫu"}
+      <span className="hidden lg:inline">{isLoading ? "Đang thêm..." : "Thêm 500 mẫu"}</span>
+      
     </Button>
   );
 }
