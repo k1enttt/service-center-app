@@ -77,6 +77,19 @@ const updateTicketSchema = z.object({
 });
 
 export const ticketsRouter = router({
+  getPendingCount: publicProcedure.query(async ({ ctx }) => {
+    const { count, error } = await ctx.supabaseAdmin
+      .from("service_tickets")
+      .select("*", { count: 'exact', head: true })
+      .neq("status", "completed");
+
+    if (error) {
+      throw new Error(`Failed to fetch pending tickets count: ${error.message}`);
+    }
+
+    return count || 0;
+  }),
+
   getDailyRevenue: publicProcedure.query(async ({ ctx }) => {
     const { data: tickets, error } = await ctx.supabaseAdmin
       .from("service_tickets")
@@ -236,7 +249,7 @@ export const ticketsRouter = router({
 
       const { data: productData } = await ctx.supabaseAdmin
         .from("products")
-        .select("name, brand, type")
+        .select("name, type, brands(name)")
         .eq("id", input.product_id)
         .single();
 
@@ -244,7 +257,7 @@ export const ticketsRouter = router({
       const priorityLabel = PRIORITY_LABELS[input.priority_level as keyof typeof PRIORITY_LABELS];
       const warrantyLabel = WARRANTY_LABELS[input.warranty_type as keyof typeof WARRANTY_LABELS];
       const productName = productData?.name || "Sản phẩm";
-      const productBrand = productData?.brand || "";
+      const productBrand = (productData?.brands as any)?.name || "";
       const productType = productData?.type || "";
       const customerName = customerData?.name || "Khách hàng";
       const customerPhone = customerData?.phone || "";
@@ -282,7 +295,10 @@ export const ticketsRouter = router({
           id,
           name,
           type,
-          brand
+          brands (
+            id,
+            name
+          )
         )
       `)
       .order("created_at", { ascending: false });
@@ -312,8 +328,11 @@ export const ticketsRouter = router({
             id,
             name,
             type,
-            brand,
-            model
+            model,
+            brands (
+              id,
+              name
+            )
           )
         `)
         .eq("id", input.id)
@@ -353,7 +372,7 @@ export const ticketsRouter = router({
           profiles:created_by (
             id,
             full_name,
-            roles
+            role
           )
         `)
         .eq("ticket_id", input.id)
@@ -399,6 +418,7 @@ export const ticketsRouter = router({
         .from("service_tickets")
         .update({
           status: input.status,
+          updated_by: user.id, // Set updated_by for database trigger
           ...(input.status === "in_progress" && { started_at: new Date().toISOString() }),
           ...(input.status === "completed" && { completed_at: new Date().toISOString() }),
         })
@@ -475,7 +495,9 @@ export const ticketsRouter = router({
       }
 
       // Build update object with only provided fields
-      const updateObject: any = {};
+      const updateObject: any = {
+        updated_by: user.id, // Always set updated_by to current user
+      };
 
       if (updateData.issue_description !== undefined) updateObject.issue_description = updateData.issue_description;
       if (updateData.priority_level !== undefined) updateObject.priority_level = updateData.priority_level;
@@ -994,7 +1016,7 @@ ${changes.join('\n')}
           profiles:created_by (
             id,
             full_name,
-            roles
+            role
           )
         `)
         .single();

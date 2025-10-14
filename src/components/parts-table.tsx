@@ -1,38 +1,16 @@
 "use client";
 
 import {
-  closestCenter,
-  DndContext,
-  type DragEndEvent,
-  KeyboardSensor,
-  MouseSensor,
-  TouchSensor,
-  type UniqueIdentifier,
-  useSensor,
-  useSensors,
-} from "@dnd-kit/core";
-import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
-import {
-  arrayMove,
-  SortableContext,
-  useSortable,
-  verticalListSortingStrategy,
-} from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
-import {
   IconChevronDown,
   IconChevronLeft,
   IconChevronRight,
   IconChevronsLeft,
   IconChevronsRight,
-  IconCopy,
   IconEdit,
-  IconGripVertical,
   IconLayoutColumns,
   IconPackage,
   IconPlus,
   IconDatabase,
-  IconTrash,
 } from "@tabler/icons-react";
 import {
   type ColumnDef,
@@ -44,7 +22,6 @@ import {
   getFilteredRowModel,
   getPaginationRowModel,
   getSortedRowModel,
-  type Row,
   type SortingState,
   useReactTable,
   type VisibilityState,
@@ -116,31 +93,7 @@ export const partSchema = z.object({
   updated_by: z.string().nullable(),
 });
 
-function DragHandle({ id }: { id: string }) {
-  const { attributes, listeners } = useSortable({
-    id,
-  });
-
-  return (
-    <Button
-      {...attributes}
-      {...listeners}
-      variant="ghost"
-      size="icon"
-      className="text-muted-foreground size-7 hover:bg-transparent"
-    >
-      <IconGripVertical className="text-muted-foreground size-3" />
-      <span className="sr-only">Kéo để sắp xếp lại</span>
-    </Button>
-  );
-}
-
 const columns: ColumnDef<z.infer<typeof partSchema>>[] = [
-  {
-    id: "drag",
-    header: () => null,
-    cell: ({ row }) => <DragHandle id={row.original.id} />,
-  },
   {
     id: "select",
     header: ({ table }) => (
@@ -174,17 +127,6 @@ const columns: ColumnDef<z.infer<typeof partSchema>>[] = [
       return <PartViewer part={row.original} />;
     },
     enableHiding: false,
-  },
-  {
-    accessorKey: "part_number",
-    header: "Mã linh kiện",
-    cell: ({ row }) => (
-      <div className="font-mono text-sm">
-        {row.original.part_number || (
-          <span className="text-muted-foreground italic">Không có mã linh kiện</span>
-        )}
-      </div>
-    ),
   },
   {
     accessorKey: "sku",
@@ -241,15 +183,6 @@ const columns: ColumnDef<z.infer<typeof partSchema>>[] = [
     ),
   },
   {
-    accessorKey: "updated_at",
-    header: "Cập nhật",
-    cell: ({ row }) => (
-      <div className="text-muted-foreground text-sm">
-        {new Date(row.original.updated_at).toLocaleDateString()}
-      </div>
-    ),
-  },
-  {
     id: "actions",
     header: "Thao tác",
     cell: ({ row }) => <QuickActions part={row.original} />,
@@ -257,68 +190,15 @@ const columns: ColumnDef<z.infer<typeof partSchema>>[] = [
 ];
 
 function QuickActions({ part }: { part: z.infer<typeof partSchema> }) {
-  const [isDeleting, setIsDeleting] = React.useState(false);
-
-  const deletePartMutation = trpc.parts.deletePart.useMutation({
-    onSuccess: () => {
-      const successMessage = `Đã xóa linh kiện "${part.name}"`;
-      console.log("[Parts] Delete part success:", successMessage, { partId: part.id, partName: part.name });
-      toast.success(successMessage);
-      window.location.reload();
-    },
-    onError: (error) => {
-      const errorMessage = error.message || "Xóa linh kiện thất bại";
-      console.error("[Parts] Delete part error:", errorMessage, { partId: part.id, partName: part.name, error });
-      toast.error(errorMessage);
-    },
-    onSettled: () => {
-      setIsDeleting(false);
-    },
-  });
-
-  const handleDelete = async () => {
-    if (!window.confirm(`Bạn có chắc chắn muốn xóa linh kiện "${part.name}"? Hành động này không thể hoàn tác.`)) {
-      return;
-    }
-
-    setIsDeleting(true);
-    deletePartMutation.mutate({ id: part.id });
-  };
-
-  const handleClone = () => {
-    const loadingMessage = `Đang sao chép ${part.name}...`;
-    const successMessage = "Sao chép linh kiện thành công";
-    const errorMessage = "Sao chép linh kiện thất bại";
-
-    console.log("[Parts] Clone part initiated:", loadingMessage, { partId: part.id, partName: part.name });
-
-    toast.promise(
-      new Promise((resolve) => setTimeout(resolve, 1000))
-        .then(() => {
-          console.log("[Parts] Clone part success:", successMessage, { partId: part.id, partName: part.name });
-          return successMessage;
-        })
-        .catch((error) => {
-          console.error("[Parts] Clone part error:", errorMessage, { partId: part.id, partName: part.name, error });
-          throw error;
-        }),
-      {
-        loading: loadingMessage,
-        success: successMessage,
-        error: errorMessage,
-      }
-    );
-  };
-
   return (
     <div className="flex items-center gap-1">
       {/* Edit Part */}
       <Tooltip>
-        <TooltipTrigger>
-          <PartsModal
-            part={part}
-            mode="edit"
-            trigger={
+        <PartsModal
+          part={part}
+          mode="edit"
+          trigger={
+            <TooltipTrigger asChild>
               <Button
                 variant="ghost"
                 size="sm"
@@ -326,75 +206,15 @@ function QuickActions({ part }: { part: z.infer<typeof partSchema> }) {
               >
                 <IconEdit className="size-5" />
               </Button>
-            }
-            onSuccess={() => window.location.reload()}
-          />
-        </TooltipTrigger>
+            </TooltipTrigger>
+          }
+          onSuccess={() => window.location.reload()}
+        />
         <TooltipContent>
           <p>Chỉnh sửa linh kiện</p>
         </TooltipContent>
       </Tooltip>
-
-      {/* Clone Part */}
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="size-9 p-0 text-muted-foreground hover:text-foreground"
-            onClick={handleClone}
-          >
-            <IconCopy className="size-5" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>
-          <p>Sao chép linh kiện</p>
-        </TooltipContent>
-      </Tooltip>
-
-      {/* Delete Part */}
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="size-9 p-0 text-muted-foreground hover:text-destructive"
-            onClick={handleDelete}
-            disabled={isDeleting}
-          >
-            <IconTrash className="size-5" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>
-          <p>Xóa linh kiện</p>
-        </TooltipContent>
-      </Tooltip>
     </div>
-  );
-}
-
-function DraggableRow({ row }: { row: Row<z.infer<typeof partSchema>> }) {
-  const { transform, transition, setNodeRef, isDragging } = useSortable({
-    id: row.original.id,
-  });
-
-  return (
-    <TableRow
-      data-state={row.getIsSelected() && "selected"}
-      data-dragging={isDragging}
-      ref={setNodeRef}
-      className="relative z-0 data-[dragging=true]:z-10 data-[dragging=true]:opacity-80"
-      style={{
-        transform: CSS.Transform.toString(transform),
-        transition: transition,
-      }}
-    >
-      {row.getVisibleCells().map((cell) => (
-        <TableCell key={cell.id}>
-          {flexRender(cell.column.columnDef.cell, cell.getContext())}
-        </TableCell>
-      ))}
-    </TableRow>
   );
 }
 
@@ -403,7 +223,6 @@ export function PartsTable({
 }: {
   data: z.infer<typeof partSchema>[];
 }) {
-  const [data, setData] = React.useState(() => initialData);
   const [rowSelection, setRowSelection] = React.useState({});
   const [columnVisibility, setColumnVisibility] =
     React.useState<VisibilityState>({});
@@ -416,30 +235,18 @@ export function PartsTable({
     pageSize: 10,
   });
   const [searchValue, setSearchValue] = React.useState("");
-  const sortableId = React.useId();
-  const sensors = useSensors(
-    useSensor(MouseSensor, {}),
-    useSensor(TouchSensor, {}),
-    useSensor(KeyboardSensor, {}),
-  );
 
   const filteredData = React.useMemo(() => {
-    if (!searchValue) return data;
+    if (!searchValue) return initialData;
 
-    return data.filter((item) => {
+    return initialData.filter((item) => {
       const searchLower = searchValue.toLowerCase();
       return (
         item.name.toLowerCase().includes(searchLower) ||
-        item.part_number?.toLowerCase().includes(searchLower) ||
         item.sku?.toLowerCase().includes(searchLower)
       );
     });
-  }, [data, searchValue]);
-
-  const dataIds = React.useMemo<UniqueIdentifier[]>(
-    () => filteredData?.map(({ id }) => id) || [],
-    [filteredData],
-  );
+  }, [initialData, searchValue]);
 
   const table = useReactTable({
     data: filteredData,
@@ -465,17 +272,6 @@ export function PartsTable({
     getFacetedRowModel: getFacetedRowModel(),
     getFacetedUniqueValues: getFacetedUniqueValues(),
   });
-
-  function handleDragEnd(event: DragEndEvent) {
-    const { active, over } = event;
-    if (active && over && active.id !== over.id) {
-      setData((currentData) => {
-        const oldIndex = currentData.findIndex((item) => item.id === active.id);
-        const newIndex = currentData.findIndex((item) => item.id === over.id);
-        return arrayMove(currentData, oldIndex, newIndex);
-      });
-    }
-  }
 
   return (
     <Tabs
@@ -526,16 +322,22 @@ export function PartsTable({
                     column.getCanHide(),
                 )
                 .map((column) => {
+                  const columnDisplayNames: Record<string, string> = {
+                    sku: "SKU",
+                    name: "Linh kiện",
+                    price: "Giá bán",
+                    cost_price: "Giá vốn",
+                    stock_quantity: "Tồn kho",
+                  };
                   return (
                     <DropdownMenuCheckboxItem
                       key={column.id}
-                      className="capitalize"
                       checked={column.getIsVisible()}
                       onCheckedChange={(value) =>
                         column.toggleVisibility(!!value)
                       }
                     >
-                      {column.id}
+                      {columnDisplayNames[column.id] || column.id}
                     </DropdownMenuCheckboxItem>
                   );
                 })}
@@ -560,62 +362,61 @@ export function PartsTable({
       >
         <div className="flex items-center gap-2">
           <Input
-            placeholder="Tìm theo tên, mã linh kiện hoặc SKU..."
+            placeholder="Tìm theo tên hoặc SKU..."
             value={searchValue}
             onChange={(event) => setSearchValue(event.target.value)}
             className="max-w-sm"
           />
         </div>
         <div className="overflow-hidden rounded-lg border">
-          <DndContext
-            collisionDetection={closestCenter}
-            modifiers={[restrictToVerticalAxis]}
-            onDragEnd={handleDragEnd}
-            sensors={sensors}
-            id={sortableId}
-          >
-            <Table>
-              <TableHeader className="bg-muted sticky top-0 z-10">
-                {table.getHeaderGroups().map((headerGroup) => (
-                  <TableRow key={headerGroup.id}>
-                    {headerGroup.headers.map((header) => {
-                      return (
-                        <TableHead key={header.id} colSpan={header.colSpan}>
-                          {header.isPlaceholder
-                            ? null
-                            : flexRender(
-                                header.column.columnDef.header,
-                                header.getContext(),
-                              )}
-                        </TableHead>
-                      );
-                    })}
-                  </TableRow>
-                ))}
-              </TableHeader>
-              <TableBody className="**:data-[slot=table-cell]:first:w-8">
-                {table.getRowModel().rows?.length ? (
-                  <SortableContext
-                    items={dataIds}
-                    strategy={verticalListSortingStrategy}
+          <Table>
+            <TableHeader className="bg-muted sticky top-0 z-10">
+              {table.getHeaderGroups().map((headerGroup) => (
+                <TableRow key={headerGroup.id}>
+                  {headerGroup.headers.map((header) => {
+                    return (
+                      <TableHead key={header.id} colSpan={header.colSpan}>
+                        {header.isPlaceholder
+                          ? null
+                          : flexRender(
+                              header.column.columnDef.header,
+                              header.getContext(),
+                            )}
+                      </TableHead>
+                    );
+                  })}
+                </TableRow>
+              ))}
+            </TableHeader>
+            <TableBody>
+              {table.getRowModel().rows?.length ? (
+                table.getRowModel().rows.map((row) => (
+                  <TableRow
+                    key={row.id}
+                    data-state={row.getIsSelected() && "selected"}
                   >
-                    {table.getRowModel().rows.map((row) => (
-                      <DraggableRow key={row.id} row={row} />
+                    {row.getVisibleCells().map((cell) => (
+                      <TableCell key={cell.id}>
+                        {flexRender(
+                          cell.column.columnDef.cell,
+                          cell.getContext(),
+                        )}
+                      </TableCell>
                     ))}
-                  </SortableContext>
-                ) : (
-                  <TableRow>
-                    <TableCell
-                      colSpan={columns.length}
-                      className="h-24 text-center"
-                    >
-                      Không tìm thấy linh kiện nào.
-                    </TableCell>
                   </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </DndContext>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell
+                    colSpan={columns.length}
+                    className="h-24 text-center"
+                  >
+                    Không tìm thấy linh kiện nào.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
         </div>
         <div className="flex items-center justify-between px-4">
           <div className="text-muted-foreground hidden flex-1 text-sm lg:flex">
@@ -720,11 +521,10 @@ function PartViewer({ part }: { part: z.infer<typeof partSchema> }) {
           </Avatar>
           <div className="flex flex-col items-start">
             <div className="font-medium">{part.name}</div>
-            <div className="text-sm text-muted-foreground">
-              {new Intl.NumberFormat("vi-VN", {
-                style: "currency",
-                currency: "VND",
-              }).format(part.price)}
+            <div className="text-sm text-muted-foreground font-mono">
+              {part.part_number || (
+                <span className="italic">Không có mã linh kiện</span>
+              )}
             </div>
           </div>
         </Button>

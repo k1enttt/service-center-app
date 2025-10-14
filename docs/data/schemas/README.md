@@ -46,20 +46,20 @@ The schema files are organized by type and numbered to ensure proper creation or
 │             │    │             │    │             │
 │ - id        │    │ - user_id   │    │ - id        │
 │ - email     │    │ - full_name │    │ - name      │
-│ - ...       │    │ - roles[]   │    │ - phone     │
+│ - ...       │    │ - role      │    │ - phone     │
 └─────────────┘    │ - email ✓   │    │ - email     │
      (Supabase)    │ - is_active │    │ - address   │
                    └─────────────┘    └─────────────┘
                            │                  │
                            │                  │
                            ▼                  │
-                    ┌─────────────┐          │
-                    │  products   │          │
-                    │             │          │
-                    │ - id        │          │
-                    │ - name      │          │
-                    │ - sku       │          │
-                    │ - brand     │          │
+    ┌─────────────┐ ┌─────────────┐          │
+    │   brands    │─│  products   │          │
+    │             │ │             │          │
+    │ - id        │ │ - id        │          │
+    │ - name      │ │ - name      │          │
+    │ - desc      │ │ - sku       │          │
+    └─────────────┘ │ - brand_id→ │          │
                     │ - model     │          │
                     └─────────────┘          │
                            │                  │
@@ -110,7 +110,7 @@ Legend:
 
 ### 1. Authentication & Authorization
 - Integrates with Supabase Auth (`auth.users`)
-- Role-based access control via `profiles.roles[]` (admin, manager, technician, reception)
+- Role-based access control via `profiles.role` (admin, manager, technician, reception)
 - Row Level Security (RLS) policies for data protection
 - Email validation on profiles with regex constraint
 
@@ -460,8 +460,8 @@ All tables have RLS enabled with policies that ensure:
   - `service_tickets(status, created_at)` - Optimizes ticket filtering and sorting by date within status
 - **Partial indexes** for filtered queries:
   - Active records only (e.g., `is_active = true` on profiles, customers, products, parts)
-- **GIN indexes** for array operations:
-  - `profiles.roles` for role membership checks
+- **Btree indexes** for single-value columns:
+  - `profiles.role` for role-based access checks
 
 ### Query Optimization
 - **Views for common joins**:

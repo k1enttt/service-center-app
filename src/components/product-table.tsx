@@ -1,34 +1,13 @@
 "use client";
 
 import {
-  closestCenter,
-  DndContext,
-  type DragEndEvent,
-  KeyboardSensor,
-  MouseSensor,
-  TouchSensor,
-  type UniqueIdentifier,
-  useSensor,
-  useSensors,
-} from "@dnd-kit/core";
-import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
-import {
-  arrayMove,
-  SortableContext,
-  useSortable,
-  verticalListSortingStrategy,
-} from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
-import {
   IconChevronDown,
   IconChevronLeft,
   IconChevronRight,
   IconChevronsLeft,
   IconChevronsRight,
-  IconCopy,
   IconDatabase,
   IconEdit,
-  IconGripVertical,
   IconLayoutColumns,
   IconPackage,
   IconPlus,
@@ -44,7 +23,6 @@ import {
   getFilteredRowModel,
   getPaginationRowModel,
   getSortedRowModel,
-  type Row,
   type SortingState,
   useReactTable,
   type VisibilityState,
@@ -120,31 +98,7 @@ export const productSchema = z.object({
   updated_by: z.string().nullable(),
 });
 
-function DragHandle({ id }: { id: string }) {
-  const { attributes, listeners } = useSortable({
-    id,
-  });
-
-  return (
-    <Button
-      {...attributes}
-      {...listeners}
-      variant="ghost"
-      size="icon"
-      className="text-muted-foreground size-7 hover:bg-transparent"
-    >
-      <IconGripVertical className="text-muted-foreground size-3" />
-      <span className="sr-only">Kéo để sắp xếp lại</span>
-    </Button>
-  );
-}
-
 const columns: ColumnDef<z.infer<typeof productSchema>>[] = [
-  {
-    id: "drag",
-    header: () => null,
-    cell: ({ row }) => <DragHandle id={row.original.id} />,
-  },
   {
     id: "select",
     header: ({ table }) => (
@@ -215,17 +169,6 @@ const columns: ColumnDef<z.infer<typeof productSchema>>[] = [
     ),
   },
   {
-    accessorKey: "model",
-    header: "Model",
-    cell: ({ row }) => (
-      <div className="font-medium">
-        {row.original.model || (
-          <span className="text-muted-foreground italic">No model</span>
-        )}
-      </div>
-    ),
-  },
-  {
     accessorKey: "type",
     header: "Loại",
     cell: ({ row }) => (
@@ -262,50 +205,15 @@ const columns: ColumnDef<z.infer<typeof productSchema>>[] = [
 ];
 
 function QuickActions({ product }: { product: z.infer<typeof productSchema> }) {
-  const handleClone = () => {
-    const loadingMessage = `Cloning ${product.name}...`;
-    const successMessage = "Product cloned successfully";
-    const errorMessage = "Failed to clone product";
-
-    console.log("[Products] Clone product initiated:", loadingMessage, {
-      productId: product.id,
-      productName: product.name,
-    });
-
-    toast.promise(
-      new Promise((resolve) => setTimeout(resolve, 1000))
-        .then(() => {
-          console.log("[Products] Clone product success:", successMessage, {
-            productId: product.id,
-            productName: product.name,
-          });
-          return successMessage;
-        })
-        .catch((error) => {
-          console.error("[Products] Clone product error:", errorMessage, {
-            productId: product.id,
-            productName: product.name,
-            error,
-          });
-          throw error;
-        }),
-      {
-        loading: loadingMessage,
-        success: successMessage,
-        error: errorMessage,
-      },
-    );
-  };
-
   return (
     <div className="flex items-center gap-1">
       {/* Edit Product */}
       <Tooltip>
-        <TooltipTrigger>
-          <ProductModal
-            product={product}
-            mode="edit"
-            trigger={
+        <ProductModal
+          product={product}
+          mode="edit"
+          trigger={
+            <TooltipTrigger asChild>
               <Button
                 variant="ghost"
                 size="sm"
@@ -314,57 +222,15 @@ function QuickActions({ product }: { product: z.infer<typeof productSchema> }) {
                 <IconEdit className="size-5" />
                 <span className="sr-only">Chỉnh sửa</span>
               </Button>
-            }
-            onSuccess={() => window.location.reload()}
-          />
-        </TooltipTrigger>
+            </TooltipTrigger>
+          }
+          onSuccess={() => window.location.reload()}
+        />
         <TooltipContent>
           <p>Chỉnh sửa sản phẩm</p>
         </TooltipContent>
       </Tooltip>
-
-      {/* Clone Product */}
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="size-9 p-0 text-muted-foreground hover:text-foreground"
-            onClick={handleClone}
-          >
-            <IconCopy className="size-5" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>
-          <p>Sao chép sản phẩm</p>
-        </TooltipContent>
-      </Tooltip>
     </div>
-  );
-}
-
-function DraggableRow({ row }: { row: Row<z.infer<typeof productSchema>> }) {
-  const { transform, transition, setNodeRef, isDragging } = useSortable({
-    id: row.original.id,
-  });
-
-  return (
-    <TableRow
-      data-state={row.getIsSelected() && "selected"}
-      data-dragging={isDragging}
-      ref={setNodeRef}
-      className="relative z-0 data-[dragging=true]:z-10 data-[dragging=true]:opacity-80"
-      style={{
-        transform: CSS.Transform.toString(transform),
-        transition: transition,
-      }}
-    >
-      {row.getVisibleCells().map((cell) => (
-        <TableCell key={cell.id}>
-          {flexRender(cell.column.columnDef.cell, cell.getContext())}
-        </TableCell>
-      ))}
-    </TableRow>
   );
 }
 
@@ -373,7 +239,6 @@ export function ProductTable({
 }: {
   data: z.infer<typeof productSchema>[];
 }) {
-  const [data, setData] = React.useState(() => initialData);
   const [rowSelection, setRowSelection] = React.useState({});
   const [columnVisibility, setColumnVisibility] =
     React.useState<VisibilityState>({});
@@ -386,31 +251,19 @@ export function ProductTable({
     pageSize: 10,
   });
   const [searchValue, setSearchValue] = React.useState("");
-  const sortableId = React.useId();
-  const sensors = useSensors(
-    useSensor(MouseSensor, {}),
-    useSensor(TouchSensor, {}),
-    useSensor(KeyboardSensor, {}),
-  );
 
   const filteredData = React.useMemo(() => {
-    if (!searchValue) return data;
+    if (!searchValue) return initialData;
 
-    return data.filter((item) => {
+    return initialData.filter((item) => {
       const searchLower = searchValue.toLowerCase();
       return (
         item.name.toLowerCase().includes(searchLower) ||
         item.brand_name?.toLowerCase().includes(searchLower) ||
-        item.model?.toLowerCase().includes(searchLower) ||
         item.sku?.toLowerCase().includes(searchLower)
       );
     });
-  }, [data, searchValue]);
-
-  const dataIds = React.useMemo<UniqueIdentifier[]>(
-    () => filteredData?.map(({ id }) => id) || [],
-    [filteredData],
-  );
+  }, [initialData, searchValue]);
 
   const table = useReactTable({
     data: filteredData,
@@ -436,17 +289,6 @@ export function ProductTable({
     getFacetedRowModel: getFacetedRowModel(),
     getFacetedUniqueValues: getFacetedUniqueValues(),
   });
-
-  function handleDragEnd(event: DragEndEvent) {
-    const { active, over } = event;
-    if (active && over && active.id !== over.id) {
-      setData((currentData) => {
-        const oldIndex = currentData.findIndex((item) => item.id === active.id);
-        const newIndex = currentData.findIndex((item) => item.id === over.id);
-        return arrayMove(currentData, oldIndex, newIndex);
-      });
-    }
-  }
 
   return (
     <Tabs
@@ -501,16 +343,23 @@ export function ProductTable({
                     column.getCanHide(),
                 )
                 .map((column) => {
+                  const columnDisplayNames: Record<string, string> = {
+                    sku: "SKU",
+                    name: "Sản phẩm",
+                    parts_count: "Linh kiện",
+                    brand_name: "Thương hiệu",
+                    type: "Loại",
+                    updated_at: "Cập nhật",
+                  };
                   return (
                     <DropdownMenuCheckboxItem
                       key={column.id}
-                      className="capitalize"
                       checked={column.getIsVisible()}
                       onCheckedChange={(value) =>
                         column.toggleVisibility(!!value)
                       }
                     >
-                      {column.id}
+                      {columnDisplayNames[column.id] || column.id}
                     </DropdownMenuCheckboxItem>
                   );
                 })}
@@ -535,62 +384,61 @@ export function ProductTable({
       >
         <div className="flex items-center gap-2">
           <Input
-            placeholder="Tìm theo tên, thương hiệu, model hoặc SKU..."
+            placeholder="Tìm theo tên, thương hiệu hoặc SKU..."
             value={searchValue}
             onChange={(event) => setSearchValue(event.target.value)}
             className="max-w-sm"
           />
         </div>
         <div className="overflow-hidden rounded-lg border">
-          <DndContext
-            collisionDetection={closestCenter}
-            modifiers={[restrictToVerticalAxis]}
-            onDragEnd={handleDragEnd}
-            sensors={sensors}
-            id={sortableId}
-          >
-            <Table>
-              <TableHeader className="bg-muted sticky top-0 z-10">
-                {table.getHeaderGroups().map((headerGroup) => (
-                  <TableRow key={headerGroup.id}>
-                    {headerGroup.headers.map((header) => {
-                      return (
-                        <TableHead key={header.id} colSpan={header.colSpan}>
-                          {header.isPlaceholder
-                            ? null
-                            : flexRender(
-                                header.column.columnDef.header,
-                                header.getContext(),
-                              )}
-                        </TableHead>
-                      );
-                    })}
-                  </TableRow>
-                ))}
-              </TableHeader>
-              <TableBody className="**:data-[slot=table-cell]:first:w-8">
-                {table.getRowModel().rows?.length ? (
-                  <SortableContext
-                    items={dataIds}
-                    strategy={verticalListSortingStrategy}
+          <Table>
+            <TableHeader className="bg-muted sticky top-0 z-10">
+              {table.getHeaderGroups().map((headerGroup) => (
+                <TableRow key={headerGroup.id}>
+                  {headerGroup.headers.map((header) => {
+                    return (
+                      <TableHead key={header.id} colSpan={header.colSpan}>
+                        {header.isPlaceholder
+                          ? null
+                          : flexRender(
+                              header.column.columnDef.header,
+                              header.getContext(),
+                            )}
+                      </TableHead>
+                    );
+                  })}
+                </TableRow>
+              ))}
+            </TableHeader>
+            <TableBody>
+              {table.getRowModel().rows?.length ? (
+                table.getRowModel().rows.map((row) => (
+                  <TableRow
+                    key={row.id}
+                    data-state={row.getIsSelected() && "selected"}
                   >
-                    {table.getRowModel().rows.map((row) => (
-                      <DraggableRow key={row.id} row={row} />
+                    {row.getVisibleCells().map((cell) => (
+                      <TableCell key={cell.id}>
+                        {flexRender(
+                          cell.column.columnDef.cell,
+                          cell.getContext(),
+                        )}
+                      </TableCell>
                     ))}
-                  </SortableContext>
-                ) : (
-                  <TableRow>
-                    <TableCell
-                      colSpan={columns.length}
-                      className="h-24 text-center"
-                    >
-                      Không tìm thấy sản phẩm.
-                    </TableCell>
                   </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </DndContext>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell
+                    colSpan={columns.length}
+                    className="h-24 text-center"
+                  >
+                    Không tìm thấy sản phẩm.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
         </div>
         <div className="flex items-center justify-between px-4">
           <div className="text-muted-foreground hidden flex-1 text-sm lg:flex">
@@ -1087,10 +935,13 @@ function ProductModal({
                     className="text-xs font-normal gap-1 pr-1 max-w-[200px]"
                   >
                     <span className="truncate">{option.label}</span>
-                    <button
-                      className="ml-1 rounded-full outline-none ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      className="ml-1 rounded-full outline-none ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2 cursor-pointer"
                       onKeyDown={(e) => {
-                        if (e.key === "Enter") {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
                           setFormData({
                             ...formData,
                             selected_parts: formData.selected_parts.filter(
@@ -1111,9 +962,10 @@ function ProductModal({
                           ),
                         })
                       }
+                      aria-label={`Remove ${option.label}`}
                     >
                       <IconX className="h-3 w-3 text-muted-foreground hover:text-foreground" />
-                    </button>
+                    </span>
                   </Badge>
                 )}
               />
