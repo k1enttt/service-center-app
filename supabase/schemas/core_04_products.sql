@@ -5,7 +5,7 @@ create table "products" (
   "id" uuid not null default gen_random_uuid(),
   "name" text not null,
   "type" text not null,
-  "brand" text,
+  "brand_id" uuid references "brands"("id"),
   "model" text,
   "sku" text,
   "short_description" text,
@@ -23,7 +23,7 @@ create table "products" (
 -- Create indexes for better performance
 create index "products_name_idx" on "products" using btree ("name");
 create index "products_type_idx" on "products" using btree ("type");
-create index "products_brand_idx" on "products" using btree ("brand");
+create index "products_brand_id_idx" on "products" using btree ("brand_id");
 create index "products_model_idx" on "products" using btree ("model");
 create index "products_sku_idx" on "products" using btree ("sku");
 create index "products_is_active_idx" on "products" using btree ("is_active") where is_active = true;
@@ -37,7 +37,7 @@ create trigger "products_updated_at_trigger"
 -- Enable RLS (Row Level Security)
 alter table "products" enable row level security;
 
--- RLS policies (working implementation) - products can be accessed by all authenticated staff
+-- RLS policies - products can be accessed by all authenticated staff
 create policy "products_select_policy" on "products"
   for select using (true);
 
@@ -49,8 +49,5 @@ create policy "products_update_policy" on "products"
 
 create policy "products_delete_policy" on "products"
   for delete using (
-    exists (
-      select 1 from profiles
-      where user_id = (select auth.uid()) and ('admin' = any(roles) or 'manager' = any(roles))
-    )
+    public.is_admin_or_manager()
   );

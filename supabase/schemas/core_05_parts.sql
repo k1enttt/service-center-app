@@ -40,7 +40,7 @@ create trigger "parts_updated_at_trigger"
 -- Enable RLS (Row Level Security)
 alter table "parts" enable row level security;
 
--- RLS policies (working implementation) - parts can be accessed by all authenticated staff
+-- RLS policies - parts can be accessed by all authenticated staff
 create policy "parts_select_policy" on "parts"
   for select using (true);
 
@@ -52,8 +52,5 @@ create policy "parts_update_policy" on "parts"
 
 create policy "parts_delete_policy" on "parts"
   for delete using (
-    exists (
-      select 1 from profiles
-      where user_id = (select auth.uid()) and ('admin' = any(roles) or 'manager' = any(roles))
-    )
+    public.is_admin_or_manager()
   );

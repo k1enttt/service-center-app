@@ -37,17 +37,21 @@ fi
 echo -e "${BLUE}📁 Copying schema files in proper order...${NC}"
 
 # Order of execution matters due to dependencies
+# 00_base_types.sql must be first (defines ENUMs and DOMAINs)
+# 00_base_functions.sql must be second (defines helper functions)
 SCHEMA_FILES=(
+    "00_base_types.sql"
     "00_base_functions.sql"
     "core_01_profiles.sql"
     "core_02_customers.sql"
-    "core_03_products.sql"
-    "core_04_parts.sql"
-    "core_05_product_parts.sql"
-    "core_06_service_tickets.sql"
-    "core_07_service_ticket_parts.sql"
-    "core_08_service_ticket_comments.sql"
-    "core_09_service_ticket_attachments.sql"
+    "core_03_brands.sql"
+    "core_04_products.sql"
+    "core_05_parts.sql"
+    "core_06_product_parts.sql"
+    "core_07_service_tickets.sql"
+    "core_08_service_ticket_parts.sql"
+    "core_09_service_ticket_comments.sql"
+    "core_10_service_ticket_attachments.sql"
     "functions_inventory.sql"
     "storage_policies.sql"
 )

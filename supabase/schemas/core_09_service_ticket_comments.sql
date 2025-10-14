@@ -5,6 +5,7 @@ create table "service_ticket_comments" (
   "id" uuid not null default gen_random_uuid(),
   "ticket_id" uuid not null references "service_tickets"("id") on delete cascade,
   "comment" text not null,
+  "comment_type" public.comment_type not null default 'note',
   "is_internal" boolean not null default false,
   "created_at" timestamptz not null default now(),
   "updated_at" timestamptz not null default now(),
@@ -28,29 +29,41 @@ create trigger "service_ticket_comments_updated_at_trigger"
 -- Enable RLS (Row Level Security)
 alter table "service_ticket_comments" enable row level security;
 
--- RLS policies (working implementation) - comments access follows service ticket permissions
+-- RLS policies - comments access follows service ticket permissions
 create policy "service_ticket_comments_select_policy" on "service_ticket_comments"
   for select using (true);
 
 create policy "service_ticket_comments_insert_policy" on "service_ticket_comments"
   for insert with check (
-    (select auth.uid()) = created_by
+    auth.uid() = created_by
   );
 
 create policy "service_ticket_comments_update_policy" on "service_ticket_comments"
   for update using (
-    (select auth.uid()) = created_by or
-    exists (
-      select 1 from profiles
-      where user_id = (select auth.uid()) and ('admin' = any(roles) or 'manager' = any(roles))
-    )
+    auth.uid() = created_by or public.is_admin_or_manager()
   );
 
 create policy "service_ticket_comments_delete_policy" on "service_ticket_comments"
   for delete using (
-    (select auth.uid()) = created_by or
-    exists (
-      select 1 from profiles
-      where user_id = (select auth.uid()) and ('admin' = any(roles) or 'manager' = any(roles))
-    )
+    auth.uid() = created_by or public.is_admin_or_manager()
   );
+
+-- View for comments with author information
+-- Makes it easy to display comments with user details
+create or replace view service_ticket_comments_with_author as
+select
+  c.id,
+  c.ticket_id,
+  c.comment,
+  c.comment_type,
+  c.is_internal,
+  c.created_at,
+  c.updated_at,
+  c.created_by,
+  c.updated_by,
+  p.full_name as author_name,
+  p.email as author_email,
+  p.avatar_url as author_avatar
+from service_ticket_comments c
+left join profiles p on p.user_id = c.created_by
+order by c.created_at desc;

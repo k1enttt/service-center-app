@@ -34,8 +34,5 @@ create policy "service_ticket_attachments_update_policy" on "service_ticket_atta
 
 create policy "service_ticket_attachments_delete_policy" on "service_ticket_attachments"
   for delete using (
-    exists (
-      select 1 from profiles
-      where user_id = (select auth.uid()) and ('admin' = any(roles) or 'manager' = any(roles))
-    )
+    public.is_admin_or_manager()
   );
