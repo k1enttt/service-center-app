@@ -52,6 +52,8 @@ import {
   getFilteredRowModel,
   getPaginationRowModel,
   getSortedRowModel,
+  type Header,
+  type HeaderGroup,
   type Row,
   type SortingState,
   useReactTable,
@@ -171,80 +173,37 @@ function DraggableRow<TData extends { id: string }>({
 interface DataTableProps<TData extends { id: string }, TValue> {
   columns: ColumnDef<TData, TValue>[];
   data: TData[];
+  table: any; // Add this prop
+  onDragEnd: (event: any) => void;
 }
 
 function DataTable<TData extends { id: string }, TValue>({
   columns,
   data,
-  searchValue,
+  table, // Use the passed table instance
   sensors,
   sortableId,
   dataIds,
+  onDragEnd,
 }: DataTableProps<TData, TValue> & {
-  searchValue: string;
   sensors: any;
   sortableId: string;
   dataIds: UniqueIdentifier[];
 }) {
-  const [sorting, setSorting] = React.useState<SortingState>([]);
-  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
-    [],
-  );
-  const [columnVisibility, setColumnVisibility] =
-    React.useState<VisibilityState>({});
-  const [rowSelection, setRowSelection] = React.useState({});
-  const [tableData, setTableData] = React.useState<TData[]>(data);
-
-  React.useEffect(() => {
-    setTableData(data);
-  }, [data]);
-
-  const table = useReactTable({
-    data: tableData,
-    columns,
-    onSortingChange: setSorting,
-    onColumnFiltersChange: setColumnFilters,
-    getCoreRowModel: getCoreRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    onColumnVisibilityChange: setColumnVisibility,
-    onRowSelectionChange: setRowSelection,
-    state: {
-      sorting,
-      columnFilters,
-      columnVisibility,
-      rowSelection,
-    },
-  });
-
-  function handleDragEnd(event: any) {
-    const { active, over } = event;
-
-    if (active.id !== over.id) {
-      setTableData((data) => {
-        const oldIndex = data.findIndex((item: any) => item.id === active.id);
-        const newIndex = data.findIndex((item: any) => item.id === over.id);
-
-        return arrayMove(data, oldIndex, newIndex);
-      });
-    }
-  }
-
   return (
     <><div className="overflow-hidden rounded-lg border">
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}
-        onDragEnd={handleDragEnd}
+        onDragEnd={onDragEnd}
         modifiers={[restrictToVerticalAxis]}
         id={sortableId}
       >
         <Table>
           <TableHeader className="bg-muted sticky top-0 z-10">
-            {table.getHeaderGroups().map((headerGroup) => (
+            {table.getHeaderGroups().map((headerGroup: HeaderGroup<TData>) => (
               <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header) => {
+                {headerGroup.headers.map((header: Header<TData, unknown>) => {
                   return (
                     <TableHead key={header.id} colSpan={header.colSpan}>
                       {header.isPlaceholder
@@ -265,7 +224,7 @@ function DataTable<TData extends { id: string }, TValue>({
                 items={dataIds}
                 strategy={verticalListSortingStrategy}
               >
-                {table.getRowModel().rows.map((row) => (
+                {table.getRowModel().rows.map((row: Row<TData>) => (
                   <DraggableRow<TData> key={row.id} row={row} />
                 ))}
               </SortableContext>
@@ -405,6 +364,19 @@ export function TicketTable({ data: initialData }: TicketTableProps) {
   React.useEffect(() => {
     setData(initialData);
   }, [initialData]);
+
+  function handleDragEnd(event: any) {
+    const { active, over } = event;
+
+    if (active.id !== over.id) {
+      setData((currentData) => {
+        const oldIndex = currentData.findIndex((item) => item.id === active.id);
+        const newIndex = currentData.findIndex((item) => item.id === over.id);
+
+        return arrayMove(currentData, oldIndex, newIndex);
+      });
+    }
+  }
 
   const createTicketMutation = trpc.tickets.createTicket.useMutation({
     onSuccess: (data) => {
@@ -1178,10 +1150,11 @@ export function TicketTable({ data: initialData }: TicketTableProps) {
         <DataTable
           columns={columns}
           data={filteredData}
-          searchValue={searchValue}
+          table={table} // Pass the table instance here
           sensors={sensors}
           sortableId={sortableId}
           dataIds={dataIds}
+          onDragEnd={handleDragEnd}
         />
       </TabsContent>
       <TabsContent

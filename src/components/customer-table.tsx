@@ -42,6 +42,8 @@ import {
   getFilteredRowModel,
   getPaginationRowModel,
   getSortedRowModel,
+  type Header,
+  type HeaderGroup,
   type Row,
   type SortingState,
   useReactTable,
@@ -154,86 +156,37 @@ function DraggableRow<TData extends { id: string }>({
 interface DataTableProps<TData extends { id: string }, TValue> {
   columns: ColumnDef<TData, TValue>[];
   data: TData[];
+  table: any;
+  onDragEnd: (event: any) => void;
 }
 
 function DataTable<TData extends { id: string }, TValue>({
   columns,
   data,
-  searchValue,
+  table,
   sensors,
   sortableId,
   dataIds,
+  onDragEnd,
 }: DataTableProps<TData, TValue> & {
-  searchValue: string;
   sensors: any;
   sortableId: string;
   dataIds: UniqueIdentifier[];
 }) {
-  const [sorting, setSorting] = React.useState<SortingState>([]);
-  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
-    [],
-  );
-  const [columnVisibility, setColumnVisibility] =
-    React.useState<VisibilityState>({});
-  const [rowSelection, setRowSelection] = React.useState({});
-  const [pagination, setPagination] = React.useState({
-    pageIndex: 0,
-    pageSize: 10,
-  });
-  const [tableData, setTableData] = React.useState<TData[]>(data);
-
-  React.useEffect(() => {
-    setTableData(data);
-  }, [data]);
-
-  const table = useReactTable({
-    data: tableData,
-    columns,
-    onSortingChange: setSorting,
-    onColumnFiltersChange: setColumnFilters,
-    getCoreRowModel: getCoreRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    onColumnVisibilityChange: setColumnVisibility,
-    onRowSelectionChange: setRowSelection,
-    onPaginationChange: setPagination,
-    state: {
-      sorting,
-      columnFilters,
-      columnVisibility,
-      rowSelection,
-      pagination,
-    },
-  });
-
-  function handleDragEnd(event: any) {
-    const { active, over } = event;
-
-    if (active.id !== over.id) {
-      setTableData((data) => {
-        const oldIndex = data.findIndex((item: any) => item.id === active.id);
-        const newIndex = data.findIndex((item: any) => item.id === over.id);
-
-        return arrayMove(data, oldIndex, newIndex);
-      });
-    }
-  }
-
   return (
     <div className="overflow-hidden rounded-lg border">
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}
-        onDragEnd={handleDragEnd}
+        onDragEnd={onDragEnd}
         modifiers={[restrictToVerticalAxis]}
         id={sortableId}
       >
         <Table>
           <TableHeader className="bg-muted sticky top-0 z-10">
-            {table.getHeaderGroups().map((headerGroup) => (
+            {table.getHeaderGroups().map((headerGroup: HeaderGroup<TData>) => (
               <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header) => {
+                {headerGroup.headers.map((header: Header<TData, unknown>) => {
                   return (
                     <TableHead key={header.id} colSpan={header.colSpan}>
                       {header.isPlaceholder
@@ -254,7 +207,7 @@ function DataTable<TData extends { id: string }, TValue>({
                 items={dataIds}
                 strategy={verticalListSortingStrategy}
               >
-                {table.getRowModel().rows.map((row) => (
+                {table.getRowModel().rows.map((row: Row<TData>) => (
                   <DraggableRow<TData> key={row.id} row={row} />
                 ))}
               </SortableContext>
@@ -357,7 +310,7 @@ interface CustomerTableProps {
 }
 
 export function CustomerTable({ data: initialData }: CustomerTableProps) {
-  const [data, _setData] = React.useState(() => initialData);
+  const [data, setData] = React.useState(() => initialData);
   const [searchValue, setSearchValue] = React.useState("");
   const [rowSelection, setRowSelection] = React.useState({});
   const [columnVisibility, setColumnVisibility] =
@@ -372,6 +325,19 @@ export function CustomerTable({ data: initialData }: CustomerTableProps) {
     useSensor(TouchSensor, {}),
     useSensor(KeyboardSensor, {}),
   );
+
+  function handleDragEnd(event: any) {
+    const { active, over } = event;
+
+    if (active.id !== over.id) {
+      setData((currentData) => {
+        const oldIndex = currentData.findIndex((item) => item.id === active.id);
+        const newIndex = currentData.findIndex((item) => item.id === over.id);
+
+        return arrayMove(currentData, oldIndex, newIndex);
+      });
+    }
+  }
 
   const handleCall = (customer: Customer) => {
     if (customer.phone) {
@@ -653,10 +619,11 @@ export function CustomerTable({ data: initialData }: CustomerTableProps) {
         <DataTable
           columns={columns}
           data={filteredData}
-          searchValue={searchValue}
+          table={table}
           sensors={sensors}
           sortableId={sortableId}
           dataIds={dataIds}
+          onDragEnd={handleDragEnd}
         />
       </TabsContent>
       <TabsContent
