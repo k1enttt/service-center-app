@@ -305,8 +305,8 @@ function QuickActions({ member, allMembers, onUpdate }: QuickActionsProps) {
 
     // TODO: Implement active status toggle API call
     const newStatus = !member.is_active;
-    const successMessage = `Tài khoản đã được ${newStatus ? "kích hoạt" : "vô hiệu hóa"}`;
-    console.log("[Team] Toggle active success:", successMessage, { member, newStatus });
+    const successMessage = `Tài khoản đã được ${newStatus ? "kích hoạt" : "vô hiệu hóa"} (tính năng này chưa có)`;
+    console.log("[Team] Toggle active success:", successMessage, { member, newStatus }, "\n(tính năng này chưa có)");
 
     // Update local state immediately for instant UI feedback
     onUpdate({
