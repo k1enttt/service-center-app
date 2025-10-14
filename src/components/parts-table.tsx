@@ -313,12 +313,12 @@ function QuickActions({ part }: { part: z.infer<typeof partSchema> }) {
   return (
     <div className="flex items-center gap-1">
       {/* Edit Part */}
-      <PartsModal
-        part={part}
-        mode="edit"
-        trigger={
-          <Tooltip>
-            <TooltipTrigger asChild>
+      <Tooltip>
+        <TooltipTrigger>
+          <PartsModal
+            part={part}
+            mode="edit"
+            trigger={
               <Button
                 variant="ghost"
                 size="sm"
@@ -326,14 +326,14 @@ function QuickActions({ part }: { part: z.infer<typeof partSchema> }) {
               >
                 <IconEdit className="size-5" />
               </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>Chỉnh sửa linh kiện</p>
-            </TooltipContent>
-          </Tooltip>
-        }
-        onSuccess={() => window.location.reload()}
-      />
+            }
+            onSuccess={() => window.location.reload()}
+          />
+        </TooltipTrigger>
+        <TooltipContent>
+          <p>Chỉnh sửa linh kiện</p>
+        </TooltipContent>
+      </Tooltip>
 
       {/* Clone Part */}
       <Tooltip>

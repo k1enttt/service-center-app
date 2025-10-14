@@ -299,27 +299,28 @@ function QuickActions({ product }: { product: z.infer<typeof productSchema> }) {
   return (
     <div className="flex items-center gap-1">
       {/* Edit Product */}
-      <ProductModal
-        product={product}
-        mode="edit"
-        trigger={
-          <Tooltip>
-            <TooltipTrigger asChild>
+      <Tooltip>
+        <TooltipTrigger>
+          <ProductModal
+            product={product}
+            mode="edit"
+            trigger={
               <Button
                 variant="ghost"
                 size="sm"
                 className="size-9 p-0 text-muted-foreground hover:text-foreground"
               >
                 <IconEdit className="size-5" />
+                <span className="sr-only">Chỉnh sửa</span>
               </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>Chỉnh sửa sản phẩm</p>
-            </TooltipContent>
-          </Tooltip>
-        }
-        onSuccess={() => window.location.reload()}
-      />
+            }
+            onSuccess={() => window.location.reload()}
+          />
+        </TooltipTrigger>
+        <TooltipContent>
+          <p>Chỉnh sửa sản phẩm</p>
+        </TooltipContent>
+      </Tooltip>
 
       {/* Clone Product */}
       <Tooltip>
